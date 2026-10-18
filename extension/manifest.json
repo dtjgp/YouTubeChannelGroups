@@ -1,0 +1,76 @@
+{
+  "manifest_version": 3,
+  "name": "频道分类 · YouTube Channel Groups",
+  "version": "0.10.0",
+  "description": "在 YouTube 网页中整理频道分类，并筛选已加载的订阅视频。数据保存在本机。",
+  "minimum_chrome_version": "120",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types ycg-bootstrap;"
+  },
+  "permissions": [
+    "storage",
+    "nativeMessaging"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "打开 YouTube 频道分类",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "design.js",
+        "work.js",
+        "privacy.js",
+        "core.js",
+        "ai.js",
+        "i18n.js",
+        "export.js",
+        "dom.js",
+        "theme.js",
+        "layout.js",
+        "styles.js",
+        "review-ui.js",
+        "organizer-ui.js",
+        "assistant-ui.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/icon48.png"
+      ],
+      "matches": [
+        "https://www.youtube.com/*"
+      ]
+    }
+  ]
+}

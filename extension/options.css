@@ -1,0 +1,63 @@
+@layer ycg.tokens, ycg.base, ycg.components, ycg.states, ycg.preferences;
+@layer ycg.base {
+  :root { font-family: var(--ycg-font); font-size: 100%; line-height: 1.65; color: var(--text); background: var(--surface); }
+  :where(main, header, section, form, fieldset, input, select, button, p, details, dialog) { box-sizing: border-box; }
+  :where(button, input, select) { font: inherit; }
+  :where(input, select) { display: block; inline-size: 100%; padding: .65em; border: 1px solid var(--control-line); border-radius: var(--ycg-radius); background: var(--surface); color: var(--text); min-block-size: 44px; }
+  button { cursor: pointer; border: 1px solid var(--raised-line); padding: .65em .9em; border-radius: var(--ycg-radius); margin-block-start: 12px; margin-inline-end: 8px; background: var(--raised); color: var(--raised-text); min-block-size: 44px; max-inline-size: 100%; }
+  label { display: block; margin-block: 14px 6px; font-weight: 600; }
+  :where(h1, h2, p, label, button, summary, code) { overflow-wrap: anywhere; }
+  h1 { font-size: 1.7rem; line-height: 1.3; margin-block: 8px 16px; }
+  h2 { font-size: 1.2rem; margin-block: 24px 8px; }
+  fieldset { min-inline-size: 0; border: 0; padding: 16px; margin: 0; border-radius: 16px; background: var(--surface); }
+  legend { font-weight: 650; padding: 4px; background: var(--surface); }
+  :focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
+  .hint, details { font-size: .875rem; color: var(--muted-text); }
+  .hint { margin-block: 4px 8px; }
+  summary { cursor: pointer; font-size: 1rem; font-weight: 600; color: var(--text); min-block-size: 32px; }
+}
+@layer ycg.components {
+  main { max-inline-size: 780px; margin: 24px auto; padding: 24px; }
+  .settings-head { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+  .app-icon { flex-shrink: 0; inline-size: 52px; block-size: 52px; border-radius: 14px; }
+  .eyebrow { color: var(--accent-text); font-size: .8125rem; font-weight: 700; letter-spacing: .1em; }
+  :where(#settings, .language-card, .privacy-card) { border: 1px solid var(--control-line); border-radius: 22px; padding: 8px; margin-block: 24px 12px; background: var(--surface); box-shadow: 0 8px 28px #0001, inset 0 1px 0 #fff8; }
+  .language-card, .privacy-card { padding: 20px; }
+  .language-card { padding: 6px; }
+  .language-content { padding: 14px; border-radius: 16px; background: var(--surface); }
+  .language-card label { margin-block-start: 0; }
+  .language-card select { max-inline-size: 300px; }
+  .language-card p { background: var(--surface); }
+  .save-feedback { margin-block-start: 20px; border-block-start: 1px solid var(--control-line); padding-block-start: 8px; }
+  progress { display: block; inline-size: 100%; block-size: 8px; margin-block: 12px; accent-color: var(--accent-text); }
+  #save { background: var(--selection); color: var(--selection-text); border-color: var(--selection); }
+  :where(#status, #privacy-status, #save-phase, #erase-status) { min-block-size: 1.5em; color: var(--accent-text); font-size: .875rem; }
+  .privacy-card { background: var(--surface); }
+  .privacy-card h2 { margin-block-start: 0; }
+  dialog { max-inline-size: min(540px, calc(100vw - 24px)); max-block-size: calc(100dvh - 32px); overflow: auto; padding: 8px; border: 1px solid var(--control-line); border-radius: 22px; color: var(--text); background: var(--surface); }
+  dialog::backdrop { background: #0007; }
+  #erase-form { padding: 16px; background: var(--surface); border-radius: 16px; }
+  #erase-title { margin-block-start: 0; }
+  .acknowledgement { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; }
+  .acknowledgement input { inline-size: 24px; block-size: 24px; min-block-size: 24px; flex-shrink: 0; accent-color: var(--selection); }
+  .dialog-actions { display: flex; justify-content: end; flex-wrap: wrap; gap: 8px; }
+  @supports (backdrop-filter: blur(1px)) {
+    #settings, .language-card, dialog { background: color-mix(in srgb, var(--surface) 86%, transparent); backdrop-filter: blur(16px) saturate(120%); }
+  }
+}
+@layer ycg.states {
+  [hidden] { display: none !important; }
+  button:hover:not(:disabled) { text-decoration: underline; }
+  button:disabled { cursor: wait; color: var(--raised-muted); border-style: dashed; }
+  #save:disabled { color: var(--selection-text); }
+  .danger, #clear { color: var(--raised-danger); }
+  input[aria-invalid="true"] { border-color: var(--danger-text); }
+  #status.error { color: var(--danger-text); }
+}
+@layer ycg.preferences {
+  @media (max-width: 600px) { main { padding: 12px; margin-block: 12px; } fieldset { padding: 10px; } .settings-head { gap: 10px; } .privacy-card { padding: 14px; } }
+  @media (pointer: coarse) { button, input, select, summary { min-block-size: 48px; } }
+  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) { #settings, .language-card, dialog { background: var(--surface); backdrop-filter: none; } }
+  @media (forced-colors: active) { :root, fieldset, #settings, .language-card, .privacy-card, dialog, #erase-form { background: Canvas; color: CanvasText; box-shadow: none; backdrop-filter: none; } }
+  @media (prefers-reduced-motion: reduce) { :where(button, input, select, dialog) { transition: none; animation: none; } }
+}
