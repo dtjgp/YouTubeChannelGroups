@@ -13,6 +13,8 @@
 | 包一致性 | 24 个运行文件和 README 与源码一致，5 个安装器文件同 v0.9.0 |
 | 测试占位值复查 | 38 个逻辑测试重跑、云端／原生／导出相关 3 个浏览器用例通过；提交检查保持启用 |
 
+GitHub 私有仓库：[dtjgp/YouTubeChannelGroups](https://github.com/dtjgp/YouTubeChannelGroups)。`main` 首次源码提交 `6465679a996b1a9d7bb20fe2e7be3f6ecc13cc50` 已推送，并核对本地与远端一致。
+
 完整方法与限制见 [draggable-launcher-v0.10.0.md](draggable-launcher-v0.10.0.md)，本机证据在 `artifacts/quality-v0100/`。常规跳过项为显式联网及人工 VoiceOver；本轮联网检查已另行执行并记录受限。未调用真实模型，未修改真实用户数据。
 
 安装包：`artifacts/youtube-channel-groups-v0.10.0.zip`，233427 字节。SHA-256：`d95ad42d4c0da4c58aa9ba72db36b88d3b006ed9e86fa8bcc177d0224239ae76`。刷新同一扩展和 YouTube 即可使用，不用重装小助手。

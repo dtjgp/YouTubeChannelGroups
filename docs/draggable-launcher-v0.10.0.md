@@ -37,7 +37,7 @@
 
 本机小助手、Manifest 权限及安全策略不变。未修改真实频道、订阅、模型账号或凭据，未调用真实模型。真实触屏、VoiceOver 和 Edge／Brave 独立实机仍需外部验收；触控模拟不等于实机验证。
 
-GitHub 仓库使用私有可见性。源码、说明与测试纳入提交；依赖、浏览器配置、密钥文件、构建物和测试输出被忽略。提交前检查所有候选文件及差异，不导出登录令牌。远端创建和推送结果在完成后记录。
+GitHub 仓库使用私有可见性。源码、说明与测试纳入提交；依赖、浏览器配置、密钥文件、构建物和测试输出被忽略。提交前检查所有候选文件及差异，不导出登录令牌。仓库 [https://github.com/dtjgp/YouTubeChannelGroups](https://github.com/dtjgp/YouTubeChannelGroups) 已创建并推送 `main`；首次源码提交 `6465679a996b1a9d7bb20fe2e7be3f6ecc13cc50` 与远端一致。工作目录没有提交构建物、测试输出或本机配置。
 
 安装包：`artifacts/youtube-channel-groups-v0.10.0.zip`，233427 字节。SHA-256：`d95ad42d4c0da4c58aa9ba72db36b88d3b006ed9e86fa8bcc177d0224239ae76`。包证据见 `artifacts/quality-v0100/release.json`。
 
