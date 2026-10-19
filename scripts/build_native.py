@@ -1,5 +1,4 @@
 """Build standalone macOS binaries and a GUI installer. Development use only."""
-import json
 from pathlib import Path
 import plistlib
 import platform
@@ -20,7 +19,8 @@ subprocess.run([*common, "native/Host.swift", "-o", str(host)], cwd=root, check=
 subprocess.run([*common, "native/Installer.swift", "-o", str(contents / "MacOS/Installer")], cwd=root, check=True)
 (contents / "Resources/ycg-native-host").write_bytes(host.read_bytes())
 (contents / "Resources/ycg-native-host").chmod(0o755)
-(contents / "Resources/defaults.json").write_text(json.dumps({"extensionPath": str(root / "extension")}), encoding="utf-8")
+# Older builds stored the build machine's extension path here; the installer now finds it relative to the bundle.
+(contents / "Resources/defaults.json").unlink(missing_ok=True)
 (contents / "Info.plist").write_bytes(plistlib.dumps({
     "CFBundleExecutable": "Installer", "CFBundleIdentifier": "com.dtjgp.youtube-channel-groups.installer",
     "CFBundleName": "YouTube 分类小助手安装器", "CFBundlePackageType": "APPL",

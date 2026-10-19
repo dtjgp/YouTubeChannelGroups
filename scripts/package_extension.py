@@ -1,6 +1,7 @@
 """Package the runtime files without test dependencies or local browser data."""
 
 import json
+import re
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -10,13 +11,20 @@ manifest = json.loads((runtime / "manifest.json").read_text())
 assert json.loads((root / "package.json").read_text())["version"] == manifest["version"]
 lock = json.loads((root / "package-lock.json").read_text())
 assert lock["version"] == lock["packages"][""]["version"] == manifest["version"]
-files = {"design.js", "work.js", "privacy.js", "manifest.json", "background.js", "core.js", "ai.js", "i18n.js", "export.js", "theme.js", "layout.js", "dom.js", "unsubscribe.js", "styles.js", "review-ui.js", "organizer-ui.js", "assistant-ui.js", "options.html", "options.js", "options.css", "content.js", *manifest["icons"].values()}
+files = {"design.js", "work.js", "privacy.js", "manifest.json", "background.js", "core.js", "ai.js", "i18n.js", "export.js", "theme.js", "layout.js", "dom.js", "unsubscribe.js", "styles.js", "review-ui.js", "organizer-ui.js", "assistant-ui.js", "options.html", "options.js", "options.css", "content.js", "_locales/en/messages.json", "_locales/zh_CN/messages.json", *manifest["icons"].values()}
 references = {
     manifest["background"]["service_worker"],
     *(name for script in manifest["content_scripts"] for name in script["js"]),
     manifest["options_ui"]["page"],
 }
 assert references <= files
+# Every __MSG_*__ placeholder in the manifest must exist in each locale.
+placeholders = set(re.findall(r"__MSG_(\w+?)__", json.dumps(manifest)))
+assert len(placeholders) == 4, placeholders
+for locale in ("en", "zh_CN"):
+    messages = json.loads((runtime / "_locales" / locale / "messages.json").read_text())
+    assert placeholders <= set(messages), (locale, placeholders - set(messages))
+assert manifest["default_locale"] == "en"
 assert set(manifest["action"]["default_icon"].values()) <= files
 assert manifest["web_accessible_resources"] == [{"resources": ["icons/icon48.png"], "matches": ["https://www.youtube.com/*"]}]
 assert manifest["permissions"] == ["storage", "nativeMessaging"]
@@ -40,6 +48,9 @@ with ZipFile(output, "w", ZIP_DEFLATED) as archive:
     app = root / "artifacts/安装YouTube分类小助手.app"
     assert (app / "Contents/MacOS/Installer").is_file(), "Run npm run build:native first"
     app_files = [path for path in app.rglob("*") if path.is_file()]
+    # A published package must not reveal the build machine's user or folders.
+    for path in app_files:
+        assert b"/Users/" not in path.read_bytes(), f"build machine path in {path.relative_to(app)}"
     for path in app_files:
         archive.write(path, "YouTubeChannelGroups/" + str(path.relative_to(app.parent)))
 with ZipFile(output) as archive:

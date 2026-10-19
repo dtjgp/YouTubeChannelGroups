@@ -1,17 +1,17 @@
 # YouTube 频道分类
 
-**YouTube Channel Groups** is a Manifest V3 extension for Chrome, Edge and Brave. It adds a floating panel to the YouTube desktop site so you can sort your subscribed channels into your own categories, then browse or filter loaded subscription videos by category. AI can suggest categories in batches, either through a local Codex or Claude CLI (via a small macOS Native Messaging helper) or through a Chat Completions–compatible API you choose. You review and edit every suggestion before it is applied, and you can undo the last AI application. Channels, categories and settings stay in your browser; there is no telemetry. The UI is available in Chinese and English: it follows the browser language until you pick one with the 中/EN button in the panel header. Other conveniences: one click auto-scrolls the subscription list to collect every channel and reports whether the list ended; unapplied AI suggestions survive a reload of the same tab; `Alt+Shift+Y` opens or minimizes the panel. An “Unsubscribe…” button on each channel opens YouTube's own unsubscribe confirmation; you confirm in YouTube, never the extension, and the channel is then removed from your list. “Refresh subscriptions” loads the full subscription list and offers to remove saved channels you no longer follow; it suggests nothing unless the list loaded completely. Install by loading the `extension/` folder as an unpacked extension (see [安装](#安装) below).
+**YouTube Channel Groups** is a Manifest V3 extension for Chrome, Edge and Brave. It adds a floating panel to the YouTube desktop site so you can sort your subscribed channels into your own categories, then browse or filter loaded subscription videos by category. AI can suggest categories in batches, either through a local Codex or Claude CLI (via a small macOS Native Messaging helper) or through a Chat Completions–compatible API you choose. You review and edit every suggestion before it is applied, and you can undo the last AI application. Channels, categories and settings stay in your browser; there is no telemetry. The UI is available in Chinese and English: it follows the browser language until you pick one with the 中/EN button in the panel header. Other conveniences: one “Refresh subscriptions” click auto-scrolls the subscription list, collects every channel, reports whether the list ended, and offers to remove saved channels you no longer follow; unapplied AI suggestions survive a reload of the same tab; `Alt+Shift+Y` opens or minimizes the panel. An “Unsubscribe…” button on each channel opens YouTube's own unsubscribe confirmation; you confirm in YouTube, never the extension, and the channel is then removed from your list. Removal suggestions appear only when the list loaded completely, and nothing is preselected. Install by loading the `extension/` folder as an unpacked extension (see [安装](#安装) below).
 
 <table>
   <tr>
-    <td width="40%"><img src="docs/images/readme/panel.png" alt="Floating panel listing collected channels with avatars, search and category filters"></td>
-    <td width="40%"><img src="docs/images/readme/review.png" alt="Classification review workspace with AI-suggested categories, filters and drag-to-categorize cards"></td>
-    <td width="20%"><img src="docs/images/readme/settings-dark-en.png" alt="English settings page in dark mode with AI provider, model and API URL fields"></td>
+    <td width="34%"><img src="docs/images/readme/panel-en.png" alt="English floating panel: Refresh subscriptions button, category chips with the AI category selected, search box and channel cards with View videos and Unsubscribe buttons"></td>
+    <td width="34%"><img src="docs/images/readme/panel-zh.png" alt="Chinese floating panel with the same layout and sample channels"></td>
+    <td width="32%"><img src="docs/images/readme/review-en.png" alt="English classification review workspace with AI-suggested categories for sample channels"></td>
   </tr>
   <tr>
-    <td>Floating channel panel</td>
+    <td>Panel (English)</td>
+    <td>面板（中文）</td>
     <td>AI classification review</td>
-    <td>Settings (English, dark)</td>
   </tr>
 </table>
 
@@ -23,7 +23,7 @@ Screenshots come from the isolated test pages in `tests/browser/` with sample ch
 
 ## 安装
 
-先下载或克隆本仓库：
+可以从 [GitHub Releases](https://github.com/dtjgp/YouTubeChannelGroups/releases) 下载 ZIP（包含扩展和 macOS 本机小助手安装器），或克隆本仓库：
 
 ```sh
 git clone https://github.com/dtjgp/YouTubeChannelGroups.git
@@ -37,26 +37,19 @@ cd YouTubeChannelGroups
 3. 点击“加载已解压的扩展程序”，选择项目中的 `extension` 文件夹。
 4. 打开或刷新 YouTube。右下角会出现“频道分类”按钮。
 
-如果使用 ZIP，请先解压，再选择其中的 `YouTubeChannelGroups/extension` 文件夹。图形安装器与该文件夹放在同一层。
+如果使用 ZIP，请先解压，再选择其中的 `YouTubeChannelGroups/extension` 文件夹。图形安装器与该文件夹放在同一层。克隆源码的用户如需本机小助手，请先按“开发与验证”构建；`artifacts/` 不在仓库中。
 
 已安装本机 `extension` 目录的用户：在扩展管理页面点击该扩展的刷新按钮，再刷新 YouTube。加载 ZIP 副本的用户，应先导出备份，再更新同一个扩展目录。不要把新版作为另一个扩展安装，否则两者的数据不会共享。
 
-从旧版本更新至 v0.14.2 只需刷新同一个扩展。使用本机 Codex／Claude 的用户请重新运行一次安装器，以更新本机小助手（修复了临时文件残留）。若之前未选择过界面语言，界面将改为跟随浏览器语言；可用面板标题栏的“中／EN”按钮切换。
+从旧版本更新至 v0.15.0 只需刷新同一个扩展。从 v0.14.1 或更早版本更新、并使用本机 Codex／Claude 的用户，请重新运行一次安装器，以更新本机小助手（v0.14.2 修复了临时文件残留）。浏览器扩展列表中的名称会按浏览器语言显示中文或英文。若之前未选择过界面语言，界面将改为跟随浏览器语言；可用面板标题栏的“中／EN”按钮切换。
 
 ## 最近更新
 
-- **v0.14.2**：全局检查后的安全与数据保护修复。
-  - 本机小助手在浏览器中断连接时，会立即删除含频道数据的临时文件；每次启动时还会清理 10 分钟以前遗留的临时目录。旧版本可能在系统临时目录留下这些文件（`ycg-native-*`）。需要重新运行安装器。
-  - 会消耗 AI 额度、修改订阅或删除数据的面板按钮，只响应真实的鼠标或键盘操作，YouTube 页面上的脚本无法代你点击。
-  - “刷新订阅”的待移除列表默认不勾选，并显示每个频道属于几个分类；同名或同头像、但地址已变化的频道会标注“可能是同一频道”。在订阅列表页刚取消关注、卡片仍显示“订阅”的频道，也会被识别为已取消关注。
-  - 重复名称修复只在安装或从 0.12.1 以前的版本升级时运行；删除过全部数据后不再运行。
-  - 修复 v0.13.0 起打包命令失败的问题，CI 增加打包检查。
-- **v0.14.1**：修复“取消关注…”在 YouTube 中确认后，频道仍留在扩展中的问题。旧版本只认一种确认框；遇到 YouTube 其他样式的确认框时，等 5 秒就放弃，之后你在 YouTube 中的确认不会被记录。现在扩展以频道按钮变回“订阅”作为成功依据，最多等待两分钟，并能识别更多种类的确认框。之前留下的频道可用“刷新订阅”移除。
-- **v0.14.0**：新增“刷新订阅”按钮。它加载完整的订阅频道列表，找出扩展中已不在订阅列表里的频道（例如你直接在 YouTube 中取消了关注），由你勾选确认后移除。详见下文“刷新订阅”。
-- **v0.13.0**：新增“取消关注…”按钮，可在面板中逐个取消关注频道。扩展只打开 YouTube 自己的确认框，最后一步由你在 YouTube 中确认；确认后该频道同时从扩展中移除。详见下文“取消关注频道”。
-- **v0.12.1**：自动修复已保存的重复频道名称。v0.12.0 只修正了之后收集的名称，已保存的“大聪看电影 大聪看电影”仍会显示两遍。现在扩展在安装或更新后检查一次已保存的频道：名称恰好是“同一段文字重复两次”时，改为只保留一次，不需要重新收集。在扩展管理页面刷新本扩展即可生效。少数本身就重复的真实名称（例如“Duran Duran”）也会被缩短，下次收集该频道时会恢复原名。
-- **v0.12.0**：面板标题栏新增“中／EN”语言切换按钮，选择立即保存，并同步到其他 YouTube 标签页和设置页。修复频道名称重复显示（如“ByteByteGo ByteByteGo”）：YouTube 在频道名旁放了一份隐藏的悬停提示文字，旧版本把它也读进了名称。已保存的重复名称会在下次收集时被正确名称覆盖（v0.12.1 起也会在更新后自动修复）。
-- **v0.11.0**：一键自动加载全部订阅并显示是否已到列表底部；未应用的 AI 分类建议在同一标签页刷新后恢复；`Alt+Shift+Y` 打开或最小化窗口；首次使用时界面语言跟随浏览器；移除不再使用的 v0.2 HTTP 桥接。
+- **v0.15.0**：面板更精简，频道列表更靠前；“自动加载全部订阅”并入“刷新订阅”；首次使用显示三步引导；最小化时的消息可被读屏读到，小图标显示提示点；Esc 先撤销最近的操作再关闭面板；扩展名称按浏览器语言显示。
+- **v0.14.2**：安全与数据保护修复：小助手临时文件清理（需重新运行安装器）、页面脚本无法代点按钮、“刷新订阅”防误删、名称修复只在需要时运行。
+- **v0.14.1**：“取消关注…”以按钮状态判断是否成功，不再因确认框样式不同而漏记。
+
+完整记录见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 键盘快捷键
 
@@ -89,7 +82,7 @@ JSON 备份保留头像地址，仍可读取没有头像字段的旧备份。CSV
 
 - 使用轻磨砂、圆角、细边框和柔和阴影。材质继续使用 YouTube 当前的颜色。玻璃效果集中在外框，文字和表单使用不透明阅读底色；文字、控件边框和焦点颜色会按对比度要求调整。
 - 宽屏和窄屏均使用悬浮窗口，不挤压原网页。没有侧栏模式或页面宽度覆盖规则，默认位于右侧。
-- 较窄窗口使用底部浮层。视频可见且下方至少有 260 像素可用空间时，浮层放在视频下方；空间不足时仍可能覆盖部分页面，可拖到其他位置，或使用最小化按钮暂时收起，也可用关闭按钮／Esc 关闭。点击网页时窗口保持打开。
+- 较窄窗口使用底部浮层。视频可见且下方至少有 260 像素可用空间时，浮层放在视频下方；空间不足时仍可能覆盖部分页面，可拖到其他位置，或使用最小化按钮暂时收起，也可用关闭按钮／Esc 关闭。Esc 按顺序处理：取消拖动、清空搜索词、离开有内容的输入框、退出审核工作台，最后才关闭面板。点击网页时窗口保持打开。
 - 全屏播放时隐藏扩展，退出全屏后恢复原来的打开状态。收起和全屏切换不会清空未应用预览或输入。
 - YouTube 自己的高优先级菜单和迷你播放器保留显示优先级。分类筛选的“显示全部”按钮移到面板内部，减少页面上的浮动控件。
 - “AI 设置”仍在独立浏览器标签页中打开，不嵌入视频区域。
@@ -110,9 +103,9 @@ JSON 备份保留头像地址，仍可读取没有头像字段的旧备份。CSV
 ## 使用
 
 1. 打开 <https://www.youtube.com/feed/channels>，确认已登录 YouTube。
-2. 点击右下角“频道分类”。点击“自动加载全部订阅”，扩展会自动滚动订阅列表，直到不再加载新频道；也可手动向下滚动。
-3. 扩展自动收集已经加载的频道。也可点击“收集已加载频道”。自动加载结束后，面板显示覆盖情况：“已到列表底部”表示列表停止增长且 YouTube 不再显示加载项；“列表可能未完”表示仍有加载项或你中途停止，可稍后再试。完成后页面滚动位置恢复。
-4. 在“管理分类”中创建分类，例如“AI”“编程”“音乐”。
+2. 点击右下角“频道分类”。点击“刷新订阅”，扩展会自动滚动订阅列表，直到不再加载新频道；也可手动向下滚动。
+3. 扩展自动收集已经加载的频道。刷新结束后，面板显示覆盖情况：“已到列表底部”表示列表停止增长且 YouTube 不再显示加载项；“列表可能未完”表示仍有加载项或你中途停止，可稍后再试。完成后页面滚动位置恢复。
+4. 在“管理分类”中创建分类，例如“AI”“编程”“音乐”。还没有分类时，“管理分类”会自动展开。
 5. 在每个频道下方勾选分类。同一个频道可加入多个分类。
 6. 打开 <https://www.youtube.com/feed/subscriptions>，在面板中点击分类，即可筛选已经加载的订阅视频。
 7. 点击面板中的“全部”或“显示全部”，恢复显示。
@@ -287,7 +280,7 @@ JSON 备份保留头像地址，仍可读取没有头像字段的旧备份。CSV
 
 ## 删除数据与连接权限
 
-打开面板底部“备份与数据”中的“数据与隐私”。在设置页可先导出 JSON 备份，再点击“删除全部扩展数据…”。确认框默认选择取消，必须勾选确认项才可删除。
+展开面板底部的“备份与数据”（默认收起），点击“数据与隐私”。在设置页可先导出 JSON 备份，再点击“删除全部扩展数据…”。确认框默认选择取消，必须勾选确认项才可删除。
 
 删除会清除频道、分类、撤销快照、AI 地址和密钥、语言、主题缓存、面板位置及尺寸。它会取消扩展中的 AI 请求、清空其他已打开面板的预览，并撤销可选 API 主机权限。撤销失败时会明确提示，可点击“撤销可选连接权限”重试。
 

@@ -54,7 +54,7 @@ final class InstallerDelegate: NSObject, NSApplicationDelegate {
                           let settings = extensions["settings"] as? [String: Any] else { continue }
                     for (id, raw) in settings {
                         guard let entry = raw as? [String: Any], let manifest = entry["manifest"] as? [String: Any],
-                              let name = manifest["name"] as? String, name == "频道分类 · YouTube Channel Groups", (try? origin(id)) != nil else { continue }
+                              let name = manifest["name"] as? String, ["频道分类 · YouTube Channel Groups", "__MSG_ycg_extension_name__"].contains(name), (try? origin(id)) != nil else { continue }
                         found.insert(id)
                     }
                 }
@@ -62,8 +62,10 @@ final class InstallerDelegate: NSObject, NSApplicationDelegate {
         }
         let sibling = Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("extension")
         if FileManager.default.fileExists(atPath: sibling.appendingPathComponent("manifest.json").path) { found.insert(extensionID(for: sibling.path)) }
-        if found.isEmpty, let url = Bundle.main.url(forResource: "defaults", withExtension: "json"), let data = try? Data(contentsOf: url),
-           let defaults = try? object(data), let path = defaults["extensionPath"] as? String { found.insert(extensionID(for: path)) }
+        // A development build sits in <repository>/artifacts; its extension folder is two levels up. No absolute
+        // path is stored in the bundle, so a published installer carries no information about the build machine.
+        let repository = Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("extension")
+        if found.isEmpty, FileManager.default.fileExists(atPath: repository.appendingPathComponent("manifest.json").path) { found.insert(extensionID(for: repository.path)) }
         return found.sorted()
     }
     @objc func installClicked() {

@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "频道分类 · YouTube Channel Groups",
-  "version": "0.14.2",
-  "description": "在 YouTube 网页中整理频道分类，并筛选已加载的订阅视频。数据保存在本机。",
+  "name": "__MSG_ycg_extension_name__",
+  "default_locale": "en",
+  "version": "0.15.0",
+  "description": "__MSG_ycg_extension_description__",
   "minimum_chrome_version": "120",
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types ycg-bootstrap;"
@@ -21,7 +22,7 @@
       "suggested_key": {
         "default": "Alt+Shift+Y"
       },
-      "description": "打开或最小化频道分类窗口 · Open or minimize the channel window"
+      "description": "__MSG_ycg_command_toggle__"
     }
   },
   "options_ui": {
@@ -32,7 +33,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "打开 YouTube 频道分类",
+    "default_title": "__MSG_ycg_action_title__",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",

@@ -1,0 +1,6 @@
+{
+  "ycg_extension_name": {"message": "YouTube Channel Groups", "description": "Extension name in the browser"},
+  "ycg_extension_description": {"message": "Sort the YouTube channels you follow into your own categories and filter loaded subscription videos. Data stays in this browser.", "description": "Extension description"},
+  "ycg_action_title": {"message": "Open YouTube Channel Groups", "description": "Toolbar button tooltip"},
+  "ycg_command_toggle": {"message": "Open or minimize the channel window", "description": "Keyboard shortcut description"}
+}

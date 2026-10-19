@@ -104,6 +104,11 @@ test.afterAll(async () => {
 });
 
 const getState = () => worker.evaluate(async () => (await chrome.storage.local.get("ycg.state.v1"))["ycg.state.v1"]);
+// Backup and category management are collapsed sections; open one by clicking its summary like a user.
+async function expand(page, selector) {
+  const details = page.locator(`#ycg-root ${selector}`);
+  if (!await details.evaluate(element => element.open)) await details.locator(":scope > summary").click();
+}
 const message = action => testClient.evaluate(action => chrome.runtime.sendMessage({scope: "ycg", type: "mutate", action}), action);
 
 test("real extension: collect, categorize, filter, dynamic cards, navigation, backup, reload", async () => {
@@ -130,7 +135,7 @@ test("real extension: collect, categorize, filter, dynamic cards, navigation, ba
   await page.getByRole("checkbox", {name: "Gamma Code：编程", exact: true}).check();
   await expect(page.getByRole("button", {name: "编程 2", exact: true})).toBeVisible();
 
-  await page.getByRole("link", {name: "② 订阅视频 ↗"}).click();
+  await page.getByRole("link", {name: "按分类筛选订阅视频 ↗"}).click();
   await page.getByRole("button", {name: "频道分类", exact: true}).click();
   await page.getByRole("button", {name: "AI 1", exact: true}).click();
   await expect(page.locator('[data-test-channel="AlphaAI"]')).toBeVisible();
@@ -162,6 +167,7 @@ test("real extension: collect, categorize, filter, dynamic cards, navigation, ba
   await expect(page.locator('[data-test-channel="BetaMusic"]').first()).toBeVisible();
 
   const downloadPromise = page.waitForEvent("download");
+  await expand(page, ".footer-menu");
   await page.getByRole("button", {name: "导出备份", exact: true}).click();
   const download = await downloadPromise;
   const backup = JSON.parse(await fs.readFile(await download.path(), "utf8"));
@@ -169,10 +175,10 @@ test("real extension: collect, categorize, filter, dynamic cards, navigation, ba
   expect(backup.groups).toHaveLength(3);
   const before = JSON.stringify(await getState());
   await page.locator('input[type="file"]').setInputFiles({name: "backup.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(backup))});
-  await expect(page.getByRole("status")).toHaveText("备份已合并，保留了现有分类");
+  await expect(page.locator(".status")).toHaveText("备份已合并，保留了现有分类");
   expect(JSON.stringify(await getState())).toBe(before);
   await page.locator('input[type="file"]').setInputFiles({name: "bad.json", mimeType: "application/json", buffer: Buffer.from('{"version":2}')});
-  await expect(page.getByRole("status")).toContainText("格式或版本不支持");
+  await expect(page.locator(".status")).toContainText("格式或版本不支持");
   expect(JSON.stringify(await getState())).toBe(before);
 
   await page.reload();
@@ -203,6 +209,7 @@ test("multi-tab serialized writes, cross-tab updates, delete, add current channe
   await expect(second.getByRole("button", {name: "并发7 0", exact: true})).toBeVisible();
   const ai = state.groups.find(group => group.name === "AI");
   const programming = state.groups.find(group => group.name === "编程");
+  await expand(page, ".manage-groups");
   await page.getByRole("textbox", {name: "重命名 AI", exact: true}).fill("人工智能");
   await page.getByRole("textbox", {name: "重命名 AI", exact: true}).press("Enter");
   await expect(second.getByRole("button", {name: "人工智能 1", exact: true})).toBeVisible();
@@ -500,6 +507,7 @@ test("live bilingual settings, real save milestones, draft preservation, exports
   await page.screenshot({path: path.join(artifacts, "preview-panel-en.png")});
   await page.getByRole("button", {name: "Back to channels and settings", exact: true}).click();
   await expect(page.getByLabel("Suggested categories for Alpha AI", {exact: true})).toHaveValue("AI建议");
+  await expand(page, ".footer-menu");
   for (const [format, suffix] of [["csv", ".csv"], ["markdown", ".md"], ["json", ".json"]]) {
     await page.getByLabel("Export format", {exact: true}).selectOption(format);
     const pending = page.waitForEvent("download");
@@ -692,6 +700,10 @@ test("narrow glass window leaves the video unchanged and stays open during page 
   await expect(page.locator(".panel")).toBeVisible();
   await expect.poll(()=>youtubeGeometry(page)).toEqual(original);
   await expect(page.getByRole("searchbox", {name: "搜索频道", exact: true})).toHaveValue("draft");
+  // Esc first clears the search term and keeps the panel open; a second Esc closes it.
+  await page.getByRole("searchbox", {name: "搜索频道", exact: true}).press("Escape");
+  await expect(page.getByRole("searchbox", {name: "搜索频道", exact: true})).toHaveValue("");
+  await expect(page.locator(".panel")).toBeVisible();
   await page.getByRole("searchbox", {name: "搜索频道", exact: true}).press("Escape");
   await expect(page.locator(".panel")).toBeHidden();
   await page.close();
@@ -1532,7 +1544,7 @@ test('channel avatars: collect, refresh, fallback, review, backup, current chann
   const brokenRequest=page.waitForRequest(base+'broken=s88-c');
   await message({type:'collect',channels:[{id:'/@gammacode',avatarUrl:base+'broken=s88-c'}]});
   await scrollCard('Gamma Code');await brokenRequest;await expect(card('Gamma Code').locator('.channel-avatar img')).toHaveCount(0);await expect(card('Gamma Code').locator('.channel-avatar')).toHaveText('GA');
-  const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'导出备份',exact:true}).click();const download=await downloadPromise;
+  await expand(page,'.footer-menu');const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'导出备份',exact:true}).click();const download=await downloadPromise;
   const backup=JSON.parse(await fs.readFile(await download.path(),'utf8'));expect(backup.channels.find(c=>c.title==='Alpha AI').avatarUrl).toBe(updated);
   const options=await configureAI('api',mockOrigin+'/v1');
   await page.getByText('✦ AI 分类助手',{exact:true}).click();await page.getByRole('button',{name:'生成分类建议',exact:true}).click();
@@ -1627,6 +1639,9 @@ test('shortcut toggle and browser-language default: toggle restores drafts, mani
   expect(await worker.evaluate(async()=>(await chrome.storage.local.get('ycg.preferences.v1'))['ycg.preferences.v1'])).toBeUndefined();
   const manifest=await worker.evaluate(()=>chrome.runtime.getManifest().commands);
   expect(manifest['toggle-panel'].suggested_key.default).toBe('Alt+Shift+Y');
+  // Manifest strings come from _locales; both locales define every key.
+  expect(await worker.evaluate(()=>['ycg_extension_name','ycg_extension_description','ycg_action_title','ycg_command_toggle'].map(key=>chrome.i18n.getMessage(key)))).toEqual(expect.arrayContaining([expect.stringMatching(/YouTube Channel Groups/)]));
+  expect((await worker.evaluate(()=>['ycg_extension_name','ycg_extension_description','ycg_action_title','ycg_command_toggle'].map(key=>chrome.i18n.getMessage(key)))).every(Boolean)).toBe(true);
   const page=await context.newPage();await page.goto('https://www.youtube.com/watch?v=example');
   const panel=page.locator('.panel');
   await expect(page.getByRole('button',{name:'频道分类',exact:true})).toBeEnabled();
@@ -1688,17 +1703,17 @@ test('auto-load: scrolls until the subscription list ends, reports coverage, and
   const page=await context.newPage();await page.goto('https://www.youtube.com/feed/channels');
   await page.evaluate(infinite,{pages:3,stall:false});
   await page.getByRole('button',{name:'频道分类',exact:true}).click();
-  await page.getByRole('button',{name:'自动加载全部订阅',exact:true}).click();
-  await expect(page.getByRole('button',{name:'停止自动加载',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'刷新订阅',exact:true}).click();
+  await expect(page.getByRole('button',{name:'停止刷新',exact:true})).toBeVisible();
   await expect(page.locator('.coverage')).toHaveText('已到列表底部：已收集全部 18 个订阅频道。',{timeout:20000});
   expect((await getState()).channels).toHaveLength(18);
   expect(await page.evaluate(()=>scrollY)).toBe(0);
   await page.goto('https://www.youtube.com/feed/subscriptions');await page.getByRole('button',{name:'频道分类',exact:true}).click();
-  await expect(page.getByRole('button',{name:'自动加载全部订阅',exact:true})).toBeHidden();
+  await expect(page.locator('.coverage')).toBeHidden();
   await page.goto('https://www.youtube.com/feed/channels');await page.evaluate(infinite,{pages:3,stall:true});
   await page.getByRole('button',{name:'频道分类',exact:true}).click();
-  await page.getByRole('button',{name:'自动加载全部订阅',exact:true}).click();
-  await page.getByRole('button',{name:'停止自动加载',exact:true}).click();
+  await page.getByRole('button',{name:'刷新订阅',exact:true}).click();
+  await page.getByRole('button',{name:'停止刷新',exact:true}).click();
   await expect(page.locator('.coverage')).toHaveText('已停止自动加载：已加载 3 个频道，列表可能未完。',{timeout:10000});
   await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
 });
@@ -1864,7 +1879,7 @@ test('page scripts cannot trigger privileged panel actions through the open shad
   const before=await getState();aiRequests.length=0;
   // What a YouTube main-world script could do: find the buttons and call click() or dispatch change events.
   const clicked=await page.evaluate(()=>{
-    const root=document.getElementById('ycg-root').shadowRoot,labels=['生成分类建议','自动加载全部订阅','刷新订阅','生成精简方案'];
+    const root=document.getElementById('ycg-root').shadowRoot,labels=['生成分类建议','刷新订阅','生成精简方案'];
     const hits=[...root.querySelectorAll('button')].filter(button=>labels.includes(button.textContent.trim())||button.classList.contains('channel-unsubscribe'));
     hits.forEach(button=>button.click());
     const box=root.querySelector('.membership input');if(box){box.checked=!box.checked;box.dispatchEvent(new Event('change',{bubbles:true}));}
@@ -1900,4 +1915,59 @@ test('refresh subscriptions: a card already showing Subscribe counts as unsubscr
   await expect(options.locator('#privacy-status')).toContainText('本机数据已删除');
   await expect(review).toBeHidden();await expect(page.locator('.coverage')).toBeHidden();
   await page.close();await options.close();await worker.evaluate(()=>chrome.storage.local.clear());
+});
+
+test('first run, collapsed sections, Esc order and messages while minimized',async()=>{
+  await worker.evaluate(()=>chrome.storage.local.set({'ycg.preferences.v1':{language:'zh-CN'}}));
+  const page=await context.newPage();await page.goto('https://www.youtube.com/watch?v=example');
+  await page.getByRole('button',{name:'频道分类',exact:true}).click();
+  // No channels: the three steps are shown; category management is open because there are no categories.
+  await expect(page.getByText('开始使用',{exact:true})).toBeVisible();
+  await expect(page.locator('#ycg-root .manage-groups')).toHaveJSProperty('open',true);
+  await expect(page.locator('#ycg-root .footer-menu')).toHaveJSProperty('open',false);
+  await expect(page.getByRole('button',{name:'恢复收集已加载频道',exact:true})).toBeHidden();
+  await expect(page.getByText('先在下方创建分类，再为频道勾选。')).toHaveCount(0);
+  // Esc in a field with text only leaves the field; the panel stays open.
+  await page.getByRole('textbox',{name:'新分类名称',exact:true}).fill('草稿');
+  await page.getByRole('textbox',{name:'新分类名称',exact:true}).press('Escape');
+  await expect(page.locator('.panel')).toBeVisible();
+  await expect(page.getByRole('textbox',{name:'新分类名称',exact:true})).toHaveValue('草稿');
+  // Channels exist: the first-run steps disappear.
+  await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state}),aiSeed);
+  await expect(page.getByText('开始使用',{exact:true})).toBeHidden();
+  // A message while minimized reaches the outside live region, and the icon shows a dot until restored.
+  await page.getByRole('button',{name:'最小化分类窗口',exact:true}).click();
+  // Moving the icon with the keyboard saves its position, which reports a status message.
+  await page.locator('#ycg-root').evaluate(host=>host.shadowRoot.querySelector('.launcher').focus());
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('#ycg-root .dock')).toHaveAttribute('data-attention','');
+  await expect(page.locator('#ycg-root > p[role=status], #ycg-root p.sr-only[role=status]').first()).not.toHaveText('');
+  await page.getByRole('button',{name:'恢复频道分类窗口',exact:true}).click();
+  await expect(page.locator('#ycg-root .dock')).not.toHaveAttribute('data-attention','');
+  const scan=await new AxeBuilder({page}).include('#ycg-root').analyze();expect(scan.violations).toEqual([]);
+  await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
+});
+
+test('README screenshots: main panel in both languages and the review workspace',async()=>{
+  const out=path.join(artifacts,'readme');await fs.mkdir(out,{recursive:true});
+  const groups=[{id:'ai',name:'AI'},{id:'code',name:'编程'},{id:'music',name:'音乐'}];
+  const sample=(id,title,groupIds)=>({id,title,aliases:[id],groupIds});
+  await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state,'ycg.preferences.v1':{language:'zh-CN'},'ycg.panel-size.v1':{width:400,height:820,right:24,bottom:24,floating:true}}),{version:1,groups,channels:[
+    sample('/@alphaai','Alpha AI',['ai']),sample('/@betamusic','Beta Music',['music']),sample('/@gammacode','Gamma Code',['code','ai']),sample('/@deltalab','Delta Lab',['ai']),sample('/@echojazz','Echo Jazz',[])]});
+  const options=await configureAI('api',mockOrigin+'/v1');await options.close();
+  const page=await context.newPage();await pinMedia(page);await page.setViewportSize({width:1280,height:900});
+  await page.goto('https://www.youtube.com/feed/subscriptions');
+  await page.getByRole('button',{name:'频道分类',exact:true}).click();
+  await page.getByRole('button',{name:'AI 3',exact:true}).click();
+  const panel=page.locator('.panel');await expect(page.locator('.channel')).toHaveCount(3);
+  await panel.screenshot({path:path.join(out,'panel-zh.png')});
+  await page.getByRole('button',{name:'EN: Switch to English',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Refresh subscriptions',exact:true})).toBeVisible();
+  await panel.screenshot({path:path.join(out,'panel-en.png')});
+  await page.getByText('✦ AI assistant',{exact:true}).click();
+  await page.getByLabel('AI channel scope',{exact:true}).selectOption('all');
+  await page.getByRole('button',{name:'Generate suggestions',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Classification review',exact:true})).toBeVisible();
+  await panel.screenshot({path:path.join(out,'review-en.png')});
+  await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
 });

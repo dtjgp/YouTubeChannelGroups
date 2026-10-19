@@ -1,0 +1,6 @@
+{
+  "ycg_extension_name": {"message": "频道分类 · YouTube Channel Groups"},
+  "ycg_extension_description": {"message": "在 YouTube 网页中整理频道分类，并筛选已加载的订阅视频。数据保存在本机。"},
+  "ycg_action_title": {"message": "打开 YouTube 频道分类"},
+  "ycg_command_toggle": {"message": "打开或最小化频道分类窗口"}
+}

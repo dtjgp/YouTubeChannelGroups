@@ -46,6 +46,7 @@
   document.documentElement.append(pageCss);
   const status = node("div", {class: "status", role: "status", "aria-live": "polite", text: "正在读取本地分类…"});
   const feedStatus = node("p", {class: "feed-status"});
+  const feedLink = link("按分类筛选订阅视频 ↗", "https://www.youtube.com/feed/subscriptions", {class: "feed-link"});
   const chips = node("div", {class: "chips", role: "group", "aria-label": "按分类筛选"});
   const channelList = node("ul", {id: "ycg-channels", tabindex: "-1", class: "channel-list", "aria-label": "频道列表"});
   const count = node("p", {class: "count"});
@@ -62,6 +63,8 @@
   ]);
   const reset = button("显示全部", () => choose("all"), {hidden: ""});
   const dock = node("div", {class: "dock"}, [launcher]);
+  const outsideStatus = node("p", {class: "sr-only", role: "status", "aria-live": "polite"});
+  const outsideAlert = node("p", {class: "sr-only", role: "alert"});
   const launcherHelp = node("span", {id: "ycg-launcher-help", class: "sr-only", text: "拖动小图标或使用方向键移动；Shift 加快；Home 复位；Enter 或空格恢复窗口。"});
   const minimize = node("button", {type: "button", onClick: () => minimizePanel(), class: "window-control minimize", "aria-label": "最小化分类窗口", title: "最小化分类窗口"});
   const minimizeIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -105,14 +108,13 @@
     event.preventDefault();
     run(async () => { await mutate({type: "createGroup", name: createInput.value}); createInput.value = ""; }, "分类已创建");
   }}, [createInput, node("button", {type: "submit", class: "primary", text: "创建"})]);
-  const collectButton = button("收集已加载频道", () => run(async () => { if (privacy.collectionPaused) privacy = (await call({type: "privacyResume"})).privacy; await scan(true); }, "频道已收集；继续滚动可发现更多"));
+  // Collection is automatic; this button only appears to resume it after a full data deletion.
+  const collectButton = button("恢复收集已加载频道", () => run(async () => { if (privacy.collectionPaused) privacy = (await call({type: "privacyResume"})).privacy; await scan(true); }, "频道已收集；继续滚动可发现更多"), {hidden: ""});
   const coverage = node("p", {class: "muted coverage", role: "status", hidden: ""});
-  const loadAllButton = button("自动加载全部订阅", () => loadAllChannels(), {privileged: true, title: "自动滚动订阅频道列表，直到不再加载新频道"});
-  async function loadAllChannels(trigger = loadAllButton) {
-    if (loadingAll) { loadingAll = false; I.set(trigger, "textContent", "正在停止…"); return null; }
+  async function loadAllChannels() {
     if (location.pathname.replace(/\/$/, "") !== "/feed/channels") { say("请先打开订阅频道列表", true); return null; }
     const epoch = privacy.epoch;
-    loadingAll = true; I.set(trigger, "textContent", trigger === syncButton ? "停止刷新" : "停止自动加载"); coverage.hidden = false; syncReview.hidden = true;
+    loadingAll = true; I.set(syncButton, "textContent", "停止刷新"); coverage.hidden = false; syncReview.hidden = true;
     I.set(coverage, "textContent", "正在自动加载订阅频道…");
     try {
       if (privacy.collectionPaused) privacy = (await call({type: "privacyResume"})).privacy;
@@ -127,21 +129,21 @@
       I.set(coverage, "textContent", text); say(text);
       return result;
     } catch (error) { I.set(coverage, "textContent", error.message); say(error.message, true); return null; }
-    finally { loadingAll = false; I.set(loadAllButton, "textContent", "自动加载全部订阅"); I.set(syncButton, "textContent", "刷新订阅"); }
+    finally { loadingAll = false; I.set(syncButton, "textContent", "刷新订阅"); }
   }
   // Refresh: load the whole subscription list, then offer to remove saved channels that are no longer in it.
   // Nothing is suggested unless the list reached its end, and nothing is removed without confirmation.
-  const syncButton = button("刷新订阅", () => syncSubscriptions(), {privileged: true, title: "加载完整的订阅列表，找出已取消关注的频道"});
+  const syncButton = button("刷新订阅", () => syncSubscriptions(), {class: "primary", privileged: true, title: "加载完整的订阅列表，收集全部频道，并找出已取消关注的频道"});
   const syncReview = node("section", {class: "sync-review", "aria-label": "已不在订阅列表中的频道", hidden: ""});
   async function syncSubscriptions() {
-    if (loadingAll) { loadAllChannels(syncButton); return; }
+    if (loadingAll) { loadingAll = false; I.set(syncButton, "textContent", "正在停止…"); return; }
     if (location.pathname.replace(/\/$/, "") !== "/feed/channels") {
       try { await call({type: "pendingSet", pending: {action: "sync"}}); } catch (error) { say(error.message, true); return; }
       say("正在打开订阅频道列表以刷新订阅…");
       location.assign("https://www.youtube.com/feed/channels");
       return;
     }
-    const result = await loadAllChannels(syncButton);
+    const result = await loadAllChannels();
     if (!result) return;
     if (!result.complete) { showSync(null, "订阅列表没有加载完整，无法判断哪些频道已取消关注。没有移除任何频道；可稍后再次刷新。"); return; }
     const cards = YCGUnsubscribe.subscribedCards(document);
@@ -205,6 +207,9 @@
       await mutate({type: "merge", state: incoming});
     }, "备份已合并，保留了现有分类");
   }});
+  // Open while there are no categories, so the first category is created before sorting; the user decides afterwards.
+  const manageGroups = node("details", {class: "manage-groups"}, [node("summary", {text: "管理分类"}), node("label", {class: "control-label", for: "ycg-new-category", text: "新分类名称"}), createForm, groupList]);
+  let hadGroups = null;
   const exportFormat = node("select", {"aria-label": "导出格式"}, [node("option", {value: "json", text: "JSON 备份"}), node("option", {value: "csv", text: "CSV 表格"}), node("option", {value: "markdown", text: "Markdown 笔记"})]);
   const head = node("header", {class: "head", role: "group", tabindex: "0", "aria-describedby": "ycg-window-help", "aria-label": "移动面板：拖动标题栏或使用方向键", title: "拖动标题栏移动；双击恢复默认位置"}, [node("div", {}, [
       node("p", {class: "eyebrow", text: "YouTube"}),
@@ -212,25 +217,25 @@
     ]), node("div", {class: "head-actions"}, [languageToggle, minimize, close])]);
   panel.append(head,
     node("div", {class: "body"}, [link("跳到频道列表", "#ycg-channels", {class: "skip-link", onClick: event => { event.preventDefault(); channelList.focus(); }}),
-      node("div", {class: "intro"}, [node("strong", {text: "从你的订阅频道开始"}), node("p", {text: "打开订阅列表，滚动加载频道。扩展会收集已加载的频道；然后在下方勾选分类。"}),
-        node("nav", {class: "links", "aria-label": "YouTube 页面"}, [link("① 订阅频道列表 ↗", "https://www.youtube.com/feed/channels"), link("② 订阅视频 ↗", "https://www.youtube.com/feed/subscriptions")])
-      ]),
-      node("div", {class: "tools"}, [collectButton, loadAllButton, syncButton, currentButton]), coverage, syncReview,
-      assistantHome,
-      node("p", {class: "section-label", text: "我的分类"}), node("div", {class: "category-tools"}, [chips, reset]), feedStatus,
+      // First run only: the three steps in order. Hidden once channels exist.
+      node("div", {class: "intro"}, [node("strong", {text: "开始使用"}), node("ol", {class: "steps"}, [
+        node("li", {}, [node("span", {text: "打开订阅频道列表，点击“刷新订阅”加载全部频道。"}), link("打开订阅频道列表 ↗", "https://www.youtube.com/feed/channels")]),
+        node("li", {text: "在“管理分类”中创建分类并勾选频道，或展开“AI 分类助手”自动分类。"}),
+        node("li", {text: "在“订阅视频”页面点击分类，筛选要看的视频。"})
+      ])]),
+      node("div", {class: "tools"}, [syncButton, collectButton, currentButton]), coverage, syncReview,
+      node("p", {class: "section-label", text: "我的分类"}), node("div", {class: "category-tools"}, [chips, reset]), feedStatus, feedLink,
+      manageGroups,
       node("label", {class: "control-label", for: "ycg-channel-search", text: "搜索频道"}), searchInput, count, channelList, channelPagination,
-      node("details", {open: ""}, [node("summary", {text: "管理分类"}), node("label", {class: "control-label", for: "ycg-new-category", text: "新分类名称"}), createForm, groupList])
+      assistantHome
     ]),
-    node("footer", {class: "footer"}, [node("details", {class: "footer-menu", open: ""}, [node("summary", {text: "备份与数据"}), node("div", {class: "tools"}, [
+    node("footer", {class: "footer"}, [node("details", {class: "footer-menu"}, [node("summary", {text: "备份与数据"}), node("div", {class: "tools"}, [
       exportFormat, button("导出备份", () => run(exportState, "备份已生成")),
       button("合并备份", () => fileInput.click()), button("数据与隐私", () => call({type: "openSettings"}).catch(error => say(error.message, true))),
       node("span", {class: "muted", text: "卸载前请备份"}), fileInput
     ])]), status]), windowHelp, ...resizeHandles
   );
   const body = panel.querySelector(".body"), footer = panel.querySelector(".footer");
-  const compactHeight = matchMedia("(max-height: 600px)");
-  const compactFooter = () => { panel.querySelector(".footer-menu").open = !compactHeight.matches; };
-  compactHeight.addEventListener("change", compactFooter); compactFooter();
   const reviewSurface = node("div", {class: "ai-assistant review-surface", "data-review": ""});
   const reviewTitle = node("h3", {id: "ycg-review-title", tabindex: "-1", text: "分类审核工作台"});
   const reviewPane = node("div", {class: "review-pane", hidden: ""}, [node("div", {class: "review-heading"}, [button("返回分类与设置", () => showReview(false)), reviewTitle]), reviewSurface]);
@@ -248,7 +253,7 @@
       target?.focus({preventScroll: true});
     }
   }
-  shadow.append(css, dock, panel, launcherHelp);
+  shadow.append(css, dock, panel, launcherHelp, outsideStatus, outsideAlert);
   const layout = YCGLayout.attach({host, panel, dock,
     onMeasure: (plan, size) => I.set(layoutLabel, "textContent", size.floating ? "浮动窗口 · 双击标题栏复位" : "悬浮窗口 · 拖动标题栏移动")
   });
@@ -414,9 +419,16 @@
   window.addEventListener("resize", cancelResize);
   document.addEventListener("fullscreenchange", () => { if (document.fullscreenElement) cancelResize(); });
 
+  // The status line lives inside the panel. While the panel is hidden or minimized, messages also go to
+  // regions outside it, and the minimized icon shows a dot until the window is restored.
   function say(message, error = false) {
     I.set(status, "textContent", message);
     status.classList.toggle("error", error);
+    if (error) I.set(outsideAlert, "textContent", message);
+    if (panel.hidden) {
+      if (!error) I.set(outsideStatus, "textContent", message);
+      if (minimized) dock.setAttribute("data-attention", "");
+    }
   }
   async function call(message) {
     let response;
@@ -445,7 +457,7 @@
     if (document.fullscreenElement) return;
     cancelLauncherDrag();
     const restoring = minimized;
-    minimized = false; updateLauncher();
+    minimized = false; dock.removeAttribute("data-attention"); updateLauncher();
     panel.hidden = false;
     layout.setOpen(true);
     launcher.setAttribute("aria-expanded", "true");
@@ -477,7 +489,17 @@
     launcher.setAttribute("aria-expanded", "false");
     if (restoreFocus && !document.fullscreenElement) launcher.focus({preventScroll: true});
   }
-  shadow.addEventListener("keydown", event => { if (event.key === "Escape" && !panel.hidden) { event.stopPropagation(); if (resizeSession) cancelResize(); else closePanel(); } });
+  // Esc undoes the nearest thing first: a drag, a search term, typing focus, the review workspace; then the panel.
+  shadow.addEventListener("keydown", event => {
+    if (event.key !== "Escape" || panel.hidden) return;
+    event.stopPropagation();
+    const field = event.target.closest?.("input:not([type=checkbox]), textarea");
+    if (resizeSession) cancelResize();
+    else if (field === searchInput && searchInput.value) { event.preventDefault(); searchInput.value = ""; search = ""; channelPage = 0; render(); }
+    else if (field?.value) field.blur();
+    else if (panel.hasAttribute("data-review")) showReview(false);
+    else closePanel();
+  });
   // Keep the field being edited in view when the panel or the channel list changes size. A search that
   // shortens the list can shrink the panel and clamp its scroll position after the focus handler ran.
   const keepEditingVisible = new ResizeObserver(() => {
@@ -505,13 +527,16 @@
     const name = state.groups.find(group => group.id === selected)?.name || I.t(selected === "unassigned" ? "未分类" : "全部");
     const subscriptions = location.pathname.replace(/\/$/, "") === "/feed/subscriptions";
     I.set(feedStatus, "textContent", subscriptions
-      ? `已加载视频：${result.visible} / ${result.recognized}。仅筛选可识别的频道视频；Shorts 合集等未识别内容保留。${result.unknown ? `另有 ${result.unknown} 个未识别卡片。` : ""}`
-      : "选择分类可查看频道；在“订阅视频”页面还会筛选已加载的视频。");
+      ? result.unknown ? `显示 ${result.visible} / ${result.recognized} 个已加载视频 · ${result.unknown} 个未识别卡片保留` : `显示 ${result.visible} / ${result.recognized} 个已加载视频`
+      : "");
+    I.set(feedStatus, "title", "只筛选能识别频道的已加载视频；Shorts 合集等未识别内容保留显示。");
+    feedStatus.hidden = !subscriptions; feedLink.hidden = subscriptions;
     I.set(launcherText, "textContent", "频道分类");
     I.set(launcher, "title", minimized ? "恢复频道分类窗口" : result.active ? `${name} · ${result.visible} 个视频` : "频道分类");
     reset.hidden = !result.active;
-    collectButton.disabled = location.pathname.replace(/\/$/, "") !== "/feed/channels";
-    loadAllButton.hidden = collectButton.disabled; if (collectButton.disabled && !loadingAll) coverage.hidden = true;
+    const channelsPage = location.pathname.replace(/\/$/, "") === "/feed/channels";
+    collectButton.hidden = !channelsPage || !privacy.collectionPaused;
+    if (!channelsPage && !loadingAll) coverage.hidden = true;
     currentButton.hidden = !Core.path(location.pathname);
   }
   function render() {
@@ -526,7 +551,10 @@
     if (!current()) return;
     const focusKey = shadow.activeElement?.dataset.focusKey;
     channelPage = view.page;
-    shadow.querySelector(".intro").classList.toggle("compact", state.channels.length > 0);
+    shadow.querySelector(".intro").hidden = state.channels.length > 0;
+    const hasGroups = state.groups.length > 0;
+    if (hadGroups === null || hadGroups !== hasGroups && !hasGroups) manageGroups.open = !hasGroups;
+    hadGroups = hasGroups;
     if (!["all", "unassigned", ...state.groups.map(group => group.id)].includes(selected)) selected = "all";
     chips.replaceChildren(...[
       {id: "all", name: I.t("全部"), count: state.channels.length},
@@ -558,7 +586,7 @@
         link("查看视频 ↗", `https://www.youtube.com${channel.id}/videos`, {class: "channel-videos", target: "_blank", rel: "noopener noreferrer", "aria-label": `查看视频：${channel.title}`}),
         button("取消关注…", () => unsubscribe(channel), {class: "channel-unsubscribe", privileged: true, "aria-label": `取消关注：${channel.title}`})
       ]),
-      state.groups.length ? memberships(channel) : node("p", {class: "muted", text: "先在下方创建分类，再为频道勾选。"})
+      ...(state.groups.length ? [memberships(channel)] : [])
     ]);
   }
   // Unsubscribe in YouTube itself: the extension opens YouTube's confirmation and the user confirms there.
