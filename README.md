@@ -280,7 +280,7 @@ npm run package
 
 源码仓库不包含构建物、依赖目录、浏览器配置或完整测试截图；`docs/images/` 只保存文档引用的精选截图。macOS 用户首次从源码构建本机小助手与安装器时，需安装 Xcode Command Line Tools、Python 3 和 Node.js，再执行以上构建步骤；生成的安装器和 ZIP 位于 `artifacts/`。浏览器端分类及云端 API 不依赖本机构建。
 
-GitHub Actions（`.github/workflows/ci.yml`）在 Ubuntu 上运行语法检查、单元测试和旧桥接测试；在 macOS 上构建本机小助手，再运行原生测试和 Playwright 浏览器测试。真实联网与 VoiceOver 测试需显式环境变量，CI 中保持跳过。
+GitHub Actions（`.github/workflows/ci.yml`）在 Ubuntu 上运行语法检查和单元测试；在 macOS 上构建本机小助手，再运行原生测试和 Playwright 浏览器测试。真实联网与 VoiceOver 测试需显式环境变量，CI 中保持跳过。
 
 浏览器测试使用 Playwright 和独立临时配置文件，实际加载 Manifest V3 扩展。测试会优先使用本机已有的 Chromium，也可通过 `YCG_CHROMIUM` 指定兼容的 Chromium 可执行文件。如果没有可用浏览器，先执行 `npx playwright install chromium`。
 
