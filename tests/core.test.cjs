@@ -112,3 +112,10 @@ test("removing a channel deletes only that channel and rejects unknown ids", () 
   assert.deepEqual(next.groups, state.groups);
   assert.throws(() => Core.reduce(next, {type: "removeChannel", channelId: "/@one"}), /频道已不存在/);
 });
+
+test("removing several channels is atomic and rejects a changed list", () => {
+  const state = {version: 1, groups: [], channels: ["/@a", "/@b", "/@c"].map(id => ({id, title: id, aliases: [id], groupIds: []}))};
+  assert.deepEqual(Core.reduce(state, {type: "removeChannels", channelIds: ["/@a", "/@c"]}).channels.map(channel => channel.id), ["/@b"]);
+  assert.throws(() => Core.reduce(state, {type: "removeChannels", channelIds: ["/@a", "/@gone"]}), /频道列表已变化/);
+  assert.throws(() => Core.reduce(state, {type: "removeChannels", channelIds: []}), /请选择要移除的频道/);
+});

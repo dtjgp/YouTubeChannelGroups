@@ -82,6 +82,9 @@ input[type="search"] { width: 100%; margin-bottom: 12px; }
 .channel-path { font-size: var(--ycg-small); color: var(--muted-text); margin: 3px 0 9px; overflow-wrap: anywhere; }
 .channel-videos { color: var(--raised-accent); display: inline-block; font-size: var(--ycg-small); padding: 5px 9px; border: 1px solid var(--control-line); border-radius: 8px; margin: 0 0 9px; text-decoration: none; background: var(--raised); }
 .channel-videos:hover { background: var(--raised); }
+.sync-review { border: 1px solid var(--control-line); border-radius: 12px; padding: 10px 12px; margin: 0 0 12px; }
+.sync-list { list-style: none; margin: 0 0 8px; padding: 0; max-height: 240px; overflow: auto; }
+.sync-item .row { display: flex; align-items: center; gap: 8px; padding: 4px 0; flex-wrap: wrap; }
 .channel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 9px; }
 .channel-actions .channel-videos { margin: 0; }
 .channel-unsubscribe { color: var(--raised-danger); font-size: var(--ycg-small); padding: 5px 9px; border-radius: 8px; }

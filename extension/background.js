@@ -12,9 +12,9 @@ importScripts(...workerScripts.map(value => bootstrap ? bootstrap.createScriptUR
 // Restrict secrets to extension pages and the service worker.
 const ready = chrome.storage.local.setAccessLevel({accessLevel: "TRUSTED_CONTEXTS"});
 const ports = new Set();
-const PREFERENCES = "ycg.preferences.v1", UNDO = "ycg.ai.undo.v1", DRAFT = "ycg.ai.draft.", UNSUBSCRIBE = "ycg.unsubscribe.";
+const PREFERENCES = "ycg.preferences.v1", UNDO = "ycg.ai.undo.v1", DRAFT = "ycg.ai.draft.", PENDING = "ycg.pending.";
 // Drafts live in session storage per tab: they survive a reload but not closing the tab or browser.
-chrome.tabs.onRemoved.addListener(tabId => { chrome.storage.session.remove([DRAFT + tabId, UNSUBSCRIBE + tabId]).catch(() => {}); });
+chrome.tabs.onRemoved.addListener(tabId => { chrome.storage.session.remove([DRAFT + tabId, PENDING + tabId]).catch(() => {}); });
 // One-time repair after an install or update (reloading an unpacked extension also counts).
 const REPAIRS = "ycg.repairs.v1";
 chrome.runtime.onInstalled.addListener(() => { serial(repairSavedNames).catch(() => {}); });
@@ -207,18 +207,20 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
     const stored = (await chrome.storage.session.get(key))[key];
     return {ok: true, draft: stored?.epoch === privacy.epoch ? YCGAI.draft(stored.draft, channelIds) : null};
   });
-  // A pending unsubscribe survives one navigation to the channel page in the same tab, for at most a minute.
-  else if (message.type === "unsubscribePending" || message.type === "unsubscribeTake") task = serial(async () => {
-    if (!sender.url?.startsWith("https://www.youtube.com/") || sender.frameId !== 0 || !Number.isInteger(sender.tab?.id)) throw new Error("只允许 YouTube 主页面取消关注");
-    const privacy = await guard(message), key = UNSUBSCRIBE + sender.tab.id;
-    if (message.type === "unsubscribePending") {
-      if (!YCGCore.path(message.channelId)) throw new Error("频道已不存在");
-      await chrome.storage.session.set({[key]: {epoch: privacy.epoch, channelId: message.channelId, expires: Date.now() + 60000}});
+  // A pending unsubscribe or subscription refresh survives one navigation in the same tab, for at most a minute.
+  else if (message.type === "pendingSet" || message.type === "pendingTake") task = serial(async () => {
+    if (!sender.url?.startsWith("https://www.youtube.com/") || sender.frameId !== 0 || !Number.isInteger(sender.tab?.id)) throw new Error("只允许 YouTube 主页面执行此操作");
+    const privacy = await guard(message), key = PENDING + sender.tab.id;
+    if (message.type === "pendingSet") {
+      const action = message.pending?.action;
+      if (action === "unsubscribe" && !YCGCore.path(message.pending.channelId)) throw new Error("频道已不存在");
+      if (!["unsubscribe", "sync"].includes(action)) throw new Error("操作无效");
+      await chrome.storage.session.set({[key]: {epoch: privacy.epoch, action, ...(action === "unsubscribe" ? {channelId: message.pending.channelId} : {}), expires: Date.now() + 60000}});
       return {ok: true};
     }
     const pending = (await chrome.storage.session.get(key))[key];
     await chrome.storage.session.remove(key);
-    return {ok: true, channelId: pending?.epoch === privacy.epoch && pending.expires > Date.now() ? pending.channelId : null};
+    return {ok: true, pending: pending?.epoch === privacy.epoch && pending.expires > Date.now() ? {action: pending.action, channelId: pending.channelId} : null};
   });
   else if (message.type === "browse") task = serial(async () => ({ok: true, view: YCGCore.browse(await readState(), message.query)}));
   else if (message.type === "nativeStatus") task = trustedSettingsPage(sender) ? nativeRequest({action: "status"}, 10000) : Promise.reject(new Error("请在 AI 设置页检测安装"));

@@ -120,6 +120,13 @@
         if (state.channels.length === count) fail("频道已不存在");
         break;
       }
+      case "removeChannels": {
+        if (!Array.isArray(action.channelIds) || !action.channelIds.length || action.channelIds.length > 10000) fail("请选择要移除的频道");
+        const ids = new Set(action.channelIds);
+        if (!action.channelIds.every(id => state.channels.some(channel => channel.id === id))) fail("频道列表已变化，请重新刷新订阅");
+        state.channels = state.channels.filter(channel => !ids.has(channel.id));
+        break;
+      }
       case "deleteGroup":
         state.groups = state.groups.filter(group => group.id !== action.id);
         state.channels.forEach(channel => { channel.groupIds = channel.groupIds.filter(id => id !== action.id); });

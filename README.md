@@ -1,6 +1,6 @@
 # YouTube 频道分类
 
-**YouTube Channel Groups** is a Manifest V3 extension for Chrome, Edge and Brave. It adds a floating panel to the YouTube desktop site so you can sort your subscribed channels into your own categories, then browse or filter loaded subscription videos by category. AI can suggest categories in batches, either through a local Codex or Claude CLI (via a small macOS Native Messaging helper) or through a Chat Completions–compatible API you choose. You review and edit every suggestion before it is applied, and you can undo the last AI application. Channels, categories and settings stay in your browser; there is no telemetry. The UI is available in Chinese and English: it follows the browser language until you pick one with the 中/EN button in the panel header. Other conveniences: one click auto-scrolls the subscription list to collect every channel and reports whether the list ended; unapplied AI suggestions survive a reload of the same tab; `Alt+Shift+Y` opens or minimizes the panel. An “Unsubscribe…” button on each channel opens YouTube's own unsubscribe confirmation; you confirm in YouTube, never the extension, and the channel is then removed from your list. Install by loading the `extension/` folder as an unpacked extension (see [安装](#安装) below).
+**YouTube Channel Groups** is a Manifest V3 extension for Chrome, Edge and Brave. It adds a floating panel to the YouTube desktop site so you can sort your subscribed channels into your own categories, then browse or filter loaded subscription videos by category. AI can suggest categories in batches, either through a local Codex or Claude CLI (via a small macOS Native Messaging helper) or through a Chat Completions–compatible API you choose. You review and edit every suggestion before it is applied, and you can undo the last AI application. Channels, categories and settings stay in your browser; there is no telemetry. The UI is available in Chinese and English: it follows the browser language until you pick one with the 中/EN button in the panel header. Other conveniences: one click auto-scrolls the subscription list to collect every channel and reports whether the list ended; unapplied AI suggestions survive a reload of the same tab; `Alt+Shift+Y` opens or minimizes the panel. An “Unsubscribe…” button on each channel opens YouTube's own unsubscribe confirmation; you confirm in YouTube, never the extension, and the channel is then removed from your list. “Refresh subscriptions” loads the full subscription list and offers to remove saved channels you no longer follow; it suggests nothing unless the list loaded completely. Install by loading the `extension/` folder as an unpacked extension (see [安装](#安装) below).
 
 <table>
   <tr>
@@ -41,10 +41,11 @@ cd YouTubeChannelGroups
 
 已安装本机 `extension` 目录的用户：在扩展管理页面点击该扩展的刷新按钮，再刷新 YouTube。加载 ZIP 副本的用户，应先导出备份，再更新同一个扩展目录。不要把新版作为另一个扩展安装，否则两者的数据不会共享。
 
-从旧版本更新至 v0.13.0 只需刷新同一个扩展，无须重新安装本机小助手。若之前未选择过界面语言，界面将改为跟随浏览器语言；可用面板标题栏的“中／EN”按钮切换。
+从旧版本更新至 v0.14.0 只需刷新同一个扩展，无须重新安装本机小助手。若之前未选择过界面语言，界面将改为跟随浏览器语言；可用面板标题栏的“中／EN”按钮切换。
 
 ## 最近更新
 
+- **v0.14.0**：新增“刷新订阅”按钮。它加载完整的订阅频道列表，找出扩展中已不在订阅列表里的频道（例如你直接在 YouTube 中取消了关注），由你勾选确认后移除。详见下文“刷新订阅”。
 - **v0.13.0**：新增“取消关注…”按钮，可在面板中逐个取消关注频道。扩展只打开 YouTube 自己的确认框，最后一步由你在 YouTube 中确认；确认后该频道同时从扩展中移除。详见下文“取消关注频道”。
 - **v0.12.1**：自动修复已保存的重复频道名称。v0.12.0 只修正了之后收集的名称，已保存的“大聪看电影 大聪看电影”仍会显示两遍。现在扩展在安装或更新后检查一次已保存的频道：名称恰好是“同一段文字重复两次”时，改为只保留一次，不需要重新收集。在扩展管理页面刷新本扩展即可生效。少数本身就重复的真实名称（例如“Duran Duran”）也会被缩短，下次收集该频道时会恢复原名。
 - **v0.12.0**：面板标题栏新增“中／EN”语言切换按钮，选择立即保存，并同步到其他 YouTube 标签页和设置页。修复频道名称重复显示（如“ByteByteGo ByteByteGo”）：YouTube 在频道名旁放了一份隐藏的悬停提示文字，旧版本把它也读进了名称。已保存的重复名称会在下次收集时被正确名称覆盖（v0.12.1 起也会在更新后自动修复）。
@@ -126,6 +127,21 @@ JSON 备份保留头像地址，仍可读取没有头像字段的旧备份。CSV
 - 开发测试使用模拟已登录状态的 YouTube 页面，无法在测试中登录真实账号；YouTube 改版后可能需要适配。首次使用时请确认结果。
 - 本页已取消关注的频道卡片在 YouTube 刷新前仍会显示，扩展不会再次收集它。
 - 不支持批量取消关注。
+
+## 刷新订阅
+
+如果你直接在 YouTube 中取消了关注，扩展里的频道不会自动消失。点击面板中的“刷新订阅”来同步：
+
+1. 不在订阅频道列表页面时，扩展会在同一标签页打开 <https://www.youtube.com/feed/channels>，再继续。
+2. 扩展自动滚动加载完整的订阅列表，与已保存的频道比较。
+3. 面板列出不在订阅列表中的频道，默认全部勾选。取消勾选要保留的频道，再点击“移除所选频道”；点击“全部保留”则不做修改。移除会同时删除这些频道的分类归属。
+
+为避免误删：
+
+- 只有列表确实加载到底（停止增长，且 YouTube 不再显示加载项），才会给出移除建议。你中途停止、网络较慢或列表未加载完时，只提示“没有加载完整”，不建议移除任何频道。
+- 一个订阅频道也没识别到时（例如未登录），不建议移除。超过一半的已保存频道缺失时，会提示你确认登录的是正确的 YouTube 账号。
+- 通过“加入当前频道”添加、但从未订阅的频道也会出现在列表中，请按需保留。
+- 刷新只修改扩展中的记录，不会修改你的 YouTube 订阅。
 
 ## 从分类中选择要看的内容
 
@@ -282,7 +298,7 @@ JSON 备份保留头像地址，仍可读取没有头像字段的旧备份。CSV
 - Shorts 合集、广告或其他无法识别的卡片保留显示。筛选计数只统计识别到的卡片。
 - 如果同一频道在不同页面使用不同地址，且页面没有提供共同地址，可能需要在频道主页重新添加或分类。
 - YouTube 更新网页结构后，频道收集或视频识别可能需要适配。
-- 在 YouTube 中直接取消订阅不会自动删除本地记录；使用面板中的“取消关注…”会同时移除。单个浏览器标签页的分类筛选在刷新后恢复为“全部”，分类归属仍会保留。
+- 在 YouTube 中直接取消订阅不会自动删除本地记录；使用面板中的“取消关注…”会同时移除，也可以用“刷新订阅”找出并移除这些频道。单个浏览器标签页的分类筛选在刷新后恢复为“全部”，分类归属仍会保留。
 - 支持 YouTube 桌面网站 `https://www.youtube.com/`；不覆盖手机 App、移动网页、Safari 或 Firefox。
 
 ## 权限

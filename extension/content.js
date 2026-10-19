@@ -105,11 +105,11 @@
   const collectButton = button("收集已加载频道", () => run(async () => { if (privacy.collectionPaused) privacy = (await call({type: "privacyResume"})).privacy; await scan(true); }, "频道已收集；继续滚动可发现更多"));
   const coverage = node("p", {class: "muted coverage", role: "status", hidden: ""});
   const loadAllButton = button("自动加载全部订阅", () => loadAllChannels(), {title: "自动滚动订阅频道列表，直到不再加载新频道"});
-  async function loadAllChannels() {
-    if (loadingAll) { loadingAll = false; I.set(loadAllButton, "textContent", "正在停止…"); return; }
-    if (location.pathname.replace(/\/$/, "") !== "/feed/channels") { say("请先打开订阅频道列表", true); return; }
+  async function loadAllChannels(trigger = loadAllButton) {
+    if (loadingAll) { loadingAll = false; I.set(trigger, "textContent", "正在停止…"); return null; }
+    if (location.pathname.replace(/\/$/, "") !== "/feed/channels") { say("请先打开订阅频道列表", true); return null; }
     const epoch = privacy.epoch;
-    loadingAll = true; I.set(loadAllButton, "textContent", "停止自动加载"); coverage.hidden = false;
+    loadingAll = true; I.set(trigger, "textContent", trigger === syncButton ? "停止刷新" : "停止自动加载"); coverage.hidden = false; syncReview.hidden = true;
     I.set(coverage, "textContent", "正在自动加载订阅频道…");
     try {
       if (privacy.collectionPaused) privacy = (await call({type: "privacyResume"})).privacy;
@@ -122,8 +122,54 @@
       const text = result.complete ? `已到列表底部：已收集全部 ${result.count} 个订阅频道。`
         : result.stopped ? `已停止自动加载：已加载 ${result.count} 个频道，列表可能未完。` : `列表可能未完：已加载 ${result.count} 个频道。可稍后再次自动加载。`;
       I.set(coverage, "textContent", text); say(text);
-    } catch (error) { I.set(coverage, "textContent", error.message); say(error.message, true); }
-    finally { loadingAll = false; I.set(loadAllButton, "textContent", "自动加载全部订阅"); }
+      return result;
+    } catch (error) { I.set(coverage, "textContent", error.message); say(error.message, true); return null; }
+    finally { loadingAll = false; I.set(loadAllButton, "textContent", "自动加载全部订阅"); I.set(syncButton, "textContent", "刷新订阅"); }
+  }
+  // Refresh: load the whole subscription list, then offer to remove saved channels that are no longer in it.
+  // Nothing is suggested unless the list reached its end, and nothing is removed without confirmation.
+  const syncButton = button("刷新订阅", () => syncSubscriptions(), {title: "加载完整的订阅列表，找出已取消关注的频道"});
+  const syncReview = node("section", {class: "sync-review", "aria-label": "已不在订阅列表中的频道", hidden: ""});
+  async function syncSubscriptions() {
+    if (loadingAll) { loadAllChannels(syncButton); return; }
+    if (location.pathname.replace(/\/$/, "") !== "/feed/channels") {
+      try { await call({type: "pendingSet", pending: {action: "sync"}}); } catch (error) { say(error.message, true); return; }
+      say("正在打开订阅频道列表以刷新订阅…");
+      location.assign("https://www.youtube.com/feed/channels");
+      return;
+    }
+    const result = await loadAllChannels(syncButton);
+    if (!result) return;
+    if (!result.complete) { showSync(null, "订阅列表没有加载完整，无法判断哪些频道已取消关注。没有移除任何频道；可稍后再次刷新。"); return; }
+    const loaded = await Dom.collectAsync(document, location.pathname, () => true);
+    const present = new Set((loaded || []).flatMap(item => item.aliases));
+    if (!present.size) { showSync(null, "没有识别到订阅频道。请确认已登录 YouTube；没有移除任何频道。"); return; }
+    const stale = state.channels.filter(channel => !channel.aliases.some(alias => present.has(alias)));
+    showSync(stale, stale.length ? `有 ${stale.length} 个已保存的频道不在你当前的订阅列表中。勾选要从扩展中移除的频道。` : "已刷新：扩展中的频道都仍在订阅列表中。");
+  }
+  function showSync(stale, message) {
+    const items = (stale || []).map(channel => {
+      const input = node("input", {type: "checkbox", "aria-label": `移除 ${channel.title}`, "data-channel": channel.id});
+      input.checked = true;
+      return node("li", {class: "sync-item"}, [node("label", {class: "row"}, [input, createYCGAvatar(node, channel), node("span", {text: channel.title, localize: false}), node("span", {class: "muted", text: channel.id, localize: false})])]);
+    });
+    const children = [node("p", {text: message})];
+    if (items.length) {
+      if (items.length > state.channels.length / 2) children.push(node("p", {class: "danger", text: "超过一半的已保存频道不在列表中。请确认已登录正确的 YouTube 账号。"}));
+      children.push(node("p", {class: "muted", text: "通过“加入当前频道”添加、但从未订阅的频道也会出现在这里。移除会同时删除它们的分类归属。"}),
+        node("ul", {class: "sync-list"}, items),
+        node("div", {class: "tools"}, [
+          button("移除所选频道", () => {
+            const channelIds = [...syncReview.querySelectorAll("input[data-channel]:checked")].map(input => input.dataset.channel);
+            if (!channelIds.length) { say("请先勾选要移除的频道", true); return; }
+            run(async () => { await mutate({type: "removeChannels", channelIds}); syncReview.hidden = true; }, `已从扩展中移除 ${channelIds.length} 个频道`);
+          }, {class: "primary"}),
+          button("全部保留", () => { syncReview.hidden = true; say("已保留全部频道"); })
+        ]));
+    }
+    syncReview.replaceChildren(...children);
+    syncReview.hidden = false;
+    say(message, !stale);
   }
   const currentButton = button("加入当前频道", () => run(async () => {
     const channel = Dom.current(document, location.pathname);
@@ -161,7 +207,7 @@
       node("div", {class: "intro"}, [node("strong", {text: "从你的订阅频道开始"}), node("p", {text: "打开订阅列表，滚动加载频道。扩展会收集已加载的频道；然后在下方勾选分类。"}),
         node("nav", {class: "links", "aria-label": "YouTube 页面"}, [link("① 订阅频道列表 ↗", "https://www.youtube.com/feed/channels"), link("② 订阅视频 ↗", "https://www.youtube.com/feed/subscriptions")])
       ]),
-      node("div", {class: "tools"}, [collectButton, loadAllButton, currentButton]), coverage,
+      node("div", {class: "tools"}, [collectButton, loadAllButton, syncButton, currentButton]), coverage, syncReview,
       assistantHome,
       node("p", {class: "section-label", text: "我的分类"}), node("div", {class: "category-tools"}, [chips, reset]), feedStatus,
       node("label", {class: "control-label", for: "ycg-channel-search", text: "搜索频道"}), searchInput, count, channelList, channelPagination,
@@ -511,7 +557,7 @@
     const findArea = () => YCGUnsubscribe.area(document, location.pathname, channel);
     const control = findArea();
     if (!control) {
-      try { await call({type: "unsubscribePending", channelId: channel.id}); } catch (error) { say(error.message, true); return; }
+      try { await call({type: "pendingSet", pending: {action: "unsubscribe", channelId: channel.id}}); } catch (error) { say(error.message, true); return; }
       say("这个频道不在当前页面，正在打开频道主页…");
       location.assign(`https://www.youtube.com${channel.id}`);
       return;
@@ -539,10 +585,11 @@
     } catch (error) { say(error.message, true); }
     finally { unsubscribing = false; }
   }
-  // Continue an unsubscribe that had to open the channel page first.
-  async function resumeUnsubscribe() {
-    const {channelId} = await call({type: "unsubscribeTake"});
-    const channel = channelId && state.channels.find(item => item.id === channelId);
+  // Continue an unsubscribe or a refresh that had to open another page first.
+  async function resumePending() {
+    const {pending} = await call({type: "pendingTake"});
+    if (pending?.action === "sync") { openPanel(); return syncSubscriptions(); }
+    const channel = pending?.action === "unsubscribe" && state.channels.find(item => item.id === pending.channelId);
     if (!channel) return;
     openPanel();
     for (const end = Date.now() + 10000; Date.now() < end; await new Promise(resolve => setTimeout(resolve, 250))) {
@@ -632,7 +679,7 @@
     layout.setLauncherPosition((await call({type: "launcherPositionGet"})).position);
     state = await send({type: "get"}); render(); say("分类仅保存在这个浏览器配置文件中");
     assistant.restoreDraft();
-    resumeUnsubscribe().catch(error => say(error.message, true));
+    resumePending().catch(error => say(error.message, true));
   } catch (error) { say(error.message, true); openPanel(); }
   finally { initialized = true; launcher.disabled = false; if (openWhenReady) { openWhenReady = false; openPanel(); } }
   function connectUpdates() {

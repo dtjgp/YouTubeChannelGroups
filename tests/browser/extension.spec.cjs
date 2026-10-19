@@ -1797,3 +1797,39 @@ test('unsubscribe: a channel that is not on the page opens its channel page and 
   await page.reload();await page.waitForTimeout(1500);await expect(page.locator('yt-confirm-dialog-renderer')).toHaveCount(0);
   await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
 });
+
+test('refresh subscriptions: opens the full list, offers channels no longer subscribed, removes only confirmed ones',async()=>{
+  const saved=(id,title,groupIds=[])=>({id,title,aliases:[id],groupIds});
+  await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state,'ycg.preferences.v1':{language:'zh-CN'}}),{version:1,groups:[{id:'g',name:'AI'}],channels:[
+    saved('/@alphaai','Alpha AI',['g']),saved('/@betamusic','Beta Music'),saved('/@gammacode','Gamma Code'),saved('/@gonechannel','Gone Channel',['g']),saved('/@leftchannel','Left Channel')]});
+  const page=await context.newPage();await page.goto('https://www.youtube.com/feed/subscriptions');
+  await page.getByRole('button',{name:'频道分类',exact:true}).click();
+  await page.getByRole('button',{name:'刷新订阅',exact:true}).click();
+  await page.waitForURL('https://www.youtube.com/feed/channels');
+  const review=page.getByRole('region',{name:'已不在订阅列表中的频道'});
+  await expect(review).toContainText('有 2 个已保存的频道不在你当前的订阅列表中',{timeout:20000});
+  expect((await getState()).channels).toHaveLength(5);
+  await expect(page.getByRole('checkbox',{name:'移除 Gone Channel',exact:true})).toBeChecked();
+  await page.getByRole('checkbox',{name:'移除 Left Channel',exact:true}).uncheck();
+  await page.locator('.panel').screenshot({path:path.join(artifacts,'preview-refresh-subscriptions.png')});
+  await page.getByRole('button',{name:'移除所选频道',exact:true}).click();
+  await expect(page.locator('.status')).toHaveText('已从扩展中移除 1 个频道');
+  expect((await getState()).channels.map(channel=>channel.id)).toEqual(['/@alphaai','/@betamusic','/@gammacode','/@leftchannel']);
+  await expect(review).toBeHidden();
+  const scan=await new AxeBuilder({page}).include('#ycg-root').analyze();expect(scan.violations).toEqual([]);
+  await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
+});
+
+test('refresh subscriptions: an incomplete list suggests nothing',async()=>{
+  await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state,'ycg.preferences.v1':{language:'zh-CN'}}),{version:1,groups:[],channels:[{id:'/@gonechannel',title:'Gone Channel',aliases:['/@gonechannel'],groupIds:[]}]});
+  const page=await context.newPage();await page.goto('https://www.youtube.com/feed/channels');
+  // A loader that never finishes, as on a slow connection.
+  await page.evaluate(()=>{const main=document.querySelector('main');const spacer=document.createElement('div');spacer.style.height='2400px';main.append(spacer,document.createElement('ytd-continuation-item-renderer'));});
+  await page.getByRole('button',{name:'频道分类',exact:true}).click();
+  await page.getByRole('button',{name:'刷新订阅',exact:true}).click();
+  await page.getByRole('button',{name:'停止刷新',exact:true}).click();
+  await expect(page.getByRole('region',{name:'已不在订阅列表中的频道'})).toContainText('订阅列表没有加载完整，无法判断哪些频道已取消关注。',{timeout:10000});
+  await expect(page.getByRole('button',{name:'移除所选频道',exact:true})).toHaveCount(0);
+  expect((await getState()).channels.map(channel=>channel.id)).toContain('/@gonechannel');
+  await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
+});
