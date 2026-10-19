@@ -15,6 +15,19 @@ const ports = new Set();
 const PREFERENCES = "ycg.preferences.v1", UNDO = "ycg.ai.undo.v1", DRAFT = "ycg.ai.draft.";
 // Drafts live in session storage per tab: they survive a reload but not closing the tab or browser.
 chrome.tabs.onRemoved.addListener(tabId => { chrome.storage.session.remove(DRAFT + tabId).catch(() => {}); });
+// One-time repair after an install or update (reloading an unpacked extension also counts).
+const REPAIRS = "ycg.repairs.v1";
+chrome.runtime.onInstalled.addListener(() => { serial(repairSavedNames).catch(() => {}); });
+async function repairSavedNames() {
+  const stored = await chrome.storage.local.get([YCGCore.KEY, REPAIRS]);
+  if (stored[REPAIRS]?.doubledNames) return;
+  const updates = {[REPAIRS]: {doubledNames: true}};
+  if (stored[YCGCore.KEY]) {
+    const {state, repaired} = YCGCore.repairDoubledNames(YCGCore.validate(stored[YCGCore.KEY]));
+    if (repaired) updates[YCGCore.KEY] = state;
+  }
+  await chrome.storage.local.set(updates);
+}
 // A null language means no saved choice; pages resolve it from the browser language.
 const preferences = value => ({language: ["zh-CN", "en"].includes(value?.language) ? value.language : null});
 const syncTabTheme = tabId => chrome.tabs.sendMessage(tabId, {scope: "ycg", type: "syncTheme"}).catch(() => {});

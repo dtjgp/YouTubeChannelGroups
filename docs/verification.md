@@ -432,3 +432,11 @@ Chrome 注册文件：
 
 - 原因核对：在内置浏览器打开匿名 YouTube 频道搜索结果，读取第一个 `ytd-channel-renderer`。`#channel-title` 的 `textContent` 含两次 “ByteByteGo”，第二次位于 `tp-yt-paper-tooltip`；`yt-formatted-string#text` 只含一次。订阅频道列表需要登录，未直接检查，但使用同一 `ytd-channel-renderer` 组件（推断）。
 - 浏览器测试：按上述真实结构构造频道卡片；已保存的 “ByteByteGo ByteByteGo” 在收集后变为 “ByteByteGo”。标题栏按钮在中英之间切换，偏好写入存储，设置页同步为 English，面板位置不变，axe 扫描无违规。首次扫描发现按钮可访问名称不含可见文字（label-content-name-mismatch），已改为以可见文字开头。
+
+## v0.12.1 已保存名称修复验证
+
+- 问题：v0.12.0 只修正新收集的名称；用户截图中已保存的“大聪看电影 大聪看电影”等仍显示两遍。
+- 读取逻辑复核：在内置浏览器打开匿名 YouTube 频道搜索结果，对 6 个 `ytd-channel-renderer` 比较新旧读法。旧读法均为“名称 名称”，新读法均只有一次名称。
+- 修复：`chrome.runtime.onInstalled` 后执行一次 `YCGCore.repairDoubledNames`，以 `ycg.repairs.v1` 记录已执行。单元测试覆盖中英文名称、多词名称、非重复名称和幂等性。
+- 升级模拟（临时脚本，不在仓库测试中）：同一配置文件先以 0.11.0 运行并写入“大聪看电影 大聪看电影”，关闭后改为 0.12.1 再启动；名称变为“大聪看电影”，“大佬透镜”不变。`chrome.runtime.reload()` 在自动化中会卸载临时加载的扩展，因此没有用它验证。
+- 限制：用户需在扩展管理页刷新本扩展；“完全删除数据”会清除修复记录，此后再次更新时修复会对新数据再检查一次。

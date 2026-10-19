@@ -89,3 +89,17 @@ test("group limits and unknown operations fail without data loss", () => {
   assert.throws(() => Core.reduce(state, {type: "erase"}), /不支持/);
   assert.equal(state.groups.length, 100);
 });
+
+test("saved names doubled by the YouTube tooltip are repaired once, other names stay", () => {
+  const channel = (id, title) => ({id, title, aliases: [id], groupIds: []});
+  const state = {version: 1, groups: [], channels: [
+    channel("/@dacongmovie", "大聪看电影 大聪看电影"), channel("/@bytebytego", "ByteByteGo ByteByteGo"),
+    channel("/@split", "Two Words Two Words"), channel("/@single", "大佬透镜"), channel("/@near", "AB A")
+  ]};
+  const {state: next, repaired} = Core.repairDoubledNames(state);
+  assert.equal(repaired, 3);
+  assert.deepEqual(next.channels.map(item => item.title), ["大聪看电影", "ByteByteGo", "Two Words", "大佬透镜", "AB A"]);
+  assert.equal(state.channels[0].title, "大聪看电影 大聪看电影");
+  assert.equal(Core.repairDoubledNames(next).repaired, 0);
+  assert.deepEqual(Core.validate(next), next);
+});

@@ -222,7 +222,19 @@
   }
   const indexes = new WeakMap();
   function channelMap(state) { if (!indexes.has(state)) indexes.set(state, new Map(state.channels.map(channel => [channel.id, channel]))); return indexes.get(state); }
-  const api = {channelMap, KEY, MAX_BYTES, empty, path, avatar, validate, reduce, matches, browse};
+  // Versions before 0.12.0 read YouTube's hidden tooltip too and saved "Name Name".
+  // A real name such as "Duran Duran" would also shrink here; the next collection restores it.
+  function repairDoubledNames(state) {
+    let repaired = 0;
+    const channels = state.channels.map(channel => {
+      const match = /^(.+) \1$/u.exec(channel.title);
+      if (!match) return channel;
+      repaired++;
+      return {...channel, title: match[1]};
+    });
+    return {state: repaired ? {...state, channels} : state, repaired};
+  }
+  const api = {channelMap, KEY, MAX_BYTES, empty, path, avatar, validate, reduce, matches, browse, repairDoubledNames};
   root.YCGCore = api;
   if (typeof module !== "undefined") module.exports = api;
 })(globalThis);
