@@ -180,3 +180,11 @@
 - 原因：真实 YouTube 页面中 `ytd-channel-name#channel-title` 内含隐藏的 `tp-yt-paper-tooltip`，其中重复一份频道名；旧代码读取整个元素的 `textContent`。
 - 范围：读取名称时优先使用 `yt-formatted-string#text` 并排除提示框文字；已保存名称依靠下次收集覆盖，不做“X X”启发式修复（会误改“Duran Duran”这类真实名称）。标题栏新增语言按钮，复用现有偏好保存与跨标签同步。
 - 验证与状态：见 `verification.md` v0.12.0 一节。
+
+## 取消关注 v0.13.0
+
+- 目标：在面板中逐个取消关注频道。
+- 用户决定：由用户在 YouTube 自带确认框中做最终确认；逐个频道，不做批量；成功后从扩展中移除该频道。
+- 范围：`extension/unsubscribe.js` 按可见文字识别订阅按钮、菜单项和确认框；频道不在当前页面时，在同一标签页打开频道主页并继续（会话存储中的待办请求一分钟有效、只用一次）；新增 `removeChannel` 操作；本页已取消关注的频道不再被自动收集。
+- 边界：扩展从不点击最终确认按钮；不新增权限；不读取 Cookie，不调用 YouTube 内部接口。
+- 验证与状态：见 `verification.md` v0.13.0 一节。

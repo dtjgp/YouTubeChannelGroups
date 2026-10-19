@@ -1,6 +1,6 @@
 {
   "name": "youtube-channel-groups",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "private": true,
   "description": "Local YouTube channel categories for Chromium browsers",
   "scripts": {
@@ -8,7 +8,7 @@
     "test:browser": "playwright test",
     "test:native": "node --test tests/native/*.test.cjs",
     "build:native": "python3 scripts/build_native.py",
-    "check": "node --check extension/design.js && node --check extension/work.js && node --check extension/privacy.js && node --check extension/layout.js && node --check extension/theme.js && node --check extension/i18n.js && node --check extension/export.js && node --check extension/core.js && node --check extension/ai.js && node --check extension/dom.js && node --check extension/styles.js && node --check extension/review-ui.js && node --check extension/organizer-ui.js && node --check extension/assistant-ui.js && node --check extension/options.js && node --check extension/content.js && node --check extension/background.js",
+    "check": "node --check extension/design.js && node --check extension/work.js && node --check extension/privacy.js && node --check extension/layout.js && node --check extension/theme.js && node --check extension/i18n.js && node --check extension/export.js && node --check extension/core.js && node --check extension/ai.js && node --check extension/dom.js && node --check extension/unsubscribe.js && node --check extension/styles.js && node --check extension/review-ui.js && node --check extension/organizer-ui.js && node --check extension/assistant-ui.js && node --check extension/options.js && node --check extension/content.js && node --check extension/background.js",
     "package": "python3 scripts/package_extension.py"
   },
   "devDependencies": {

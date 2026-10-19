@@ -493,9 +493,62 @@
         link(channel.title, `https://www.youtube.com${channel.id}`, {class: "channel-title", localize: false, target: "_blank", rel: "noopener noreferrer"}),
         node("p", {class: "channel-path", text: channel.id, localize: false})
       ])]),
-      link("查看视频 ↗", `https://www.youtube.com${channel.id}/videos`, {class: "channel-videos", target: "_blank", rel: "noopener noreferrer", "aria-label": `查看视频：${channel.title}`}),
+      node("div", {class: "channel-actions"}, [
+        link("查看视频 ↗", `https://www.youtube.com${channel.id}/videos`, {class: "channel-videos", target: "_blank", rel: "noopener noreferrer", "aria-label": `查看视频：${channel.title}`}),
+        button("取消关注…", () => unsubscribe(channel), {class: "channel-unsubscribe", "aria-label": `取消关注：${channel.title}`})
+      ]),
       state.groups.length ? memberships(channel) : node("p", {class: "muted", text: "先在下方创建分类，再为频道勾选。"})
     ]);
+  }
+  // Unsubscribe in YouTube itself: the extension opens YouTube's confirmation and the user confirms there.
+  // After YouTube shows the subscribe state again, the channel is removed from the extension.
+  let unsubscribing = false;
+  // YouTube keeps an unsubscribed channel's card on the page until reload; do not collect it again.
+  const unsubscribedAliases = new Set();
+  const forget = channel => { channel.aliases.forEach(alias => unsubscribedAliases.add(alias)); return mutate({type: "removeChannel", channelId: channel.id}); };
+  async function unsubscribe(channel) {
+    if (unsubscribing) { say("另一个取消关注操作尚未完成", true); return; }
+    const findArea = () => YCGUnsubscribe.area(document, location.pathname, channel);
+    const control = findArea();
+    if (!control) {
+      try { await call({type: "unsubscribePending", channelId: channel.id}); } catch (error) { say(error.message, true); return; }
+      say("这个频道不在当前页面，正在打开频道主页…");
+      location.assign(`https://www.youtube.com${channel.id}`);
+      return;
+    }
+    const current = YCGUnsubscribe.status(control);
+    if (current.state === "unsubscribed") {
+      if (confirm(I.t(`YouTube 显示你没有订阅“${channel.title}”。只从扩展中移除这个频道？`))) run(() => forget(channel), "已从扩展中移除");
+      return;
+    }
+    if (current.state !== "subscribed") { say("未能识别 YouTube 的订阅按钮。请在 YouTube 中手动取消订阅；仅支持中文或英文的 YouTube 界面。", true); return; }
+    unsubscribing = true;
+    const epoch = privacy.epoch;
+    try {
+      say("正在打开 YouTube 的取消订阅确认框…");
+      await YCGUnsubscribe.open(document, current.button);
+      // Move the panel aside so that YouTube's dialog is not covered.
+      if (!panel.hidden) minimizePanel();
+      say(`请在 YouTube 的确认框中确认取消订阅“${channel.title}”`);
+      const result = await YCGUnsubscribe.wait(document, findArea);
+      if (epoch !== privacy.epoch) return;
+      if (minimized) openPanel();
+      if (result !== "done") { say(`未取消关注“${channel.title}”：没有在 YouTube 中完成确认`, true); return; }
+      try { await forget(channel); say(`已取消关注“${channel.title}”，并已从扩展中移除`); }
+      catch (error) { say(`已在 YouTube 取消关注“${channel.title}”，但未能从扩展中移除：${error.message}`, true); }
+    } catch (error) { say(error.message, true); }
+    finally { unsubscribing = false; }
+  }
+  // Continue an unsubscribe that had to open the channel page first.
+  async function resumeUnsubscribe() {
+    const {channelId} = await call({type: "unsubscribeTake"});
+    const channel = channelId && state.channels.find(item => item.id === channelId);
+    if (!channel) return;
+    openPanel();
+    for (const end = Date.now() + 10000; Date.now() < end; await new Promise(resolve => setTimeout(resolve, 250))) {
+      if (YCGUnsubscribe.area(document, location.pathname, channel)) return unsubscribe(channel);
+    }
+    say(`未能在频道主页找到“${channel.title}”的订阅按钮。请在 YouTube 中手动取消订阅。`, true);
   }
   function memberships(channel) {
     const build = () => node("div", {class: "memberships"}, state.groups.map(group => {
@@ -535,8 +588,9 @@
     }
     if (scanning || privacy.collectionPaused) return;
     const epoch = privacy.epoch;
-    const channels = await Dom.collectAsync(document, location.pathname, () => epoch === privacy.epoch && !privacy.collectionPaused);
-    if (!channels || epoch !== privacy.epoch) return;
+    const loaded = await Dom.collectAsync(document, location.pathname, () => epoch === privacy.epoch && !privacy.collectionPaused);
+    if (!loaded || epoch !== privacy.epoch) return;
+    const channels = loaded.filter(item => !item.aliases.some(alias => unsubscribedAliases.has(alias)));
     if (!channels.length) {
       if (explicit) throw new Error("暂未识别到频道。请确认已登录，并等待列表加载或向下滚动");
       return;
@@ -578,6 +632,7 @@
     layout.setLauncherPosition((await call({type: "launcherPositionGet"})).position);
     state = await send({type: "get"}); render(); say("分类仅保存在这个浏览器配置文件中");
     assistant.restoreDraft();
+    resumeUnsubscribe().catch(error => say(error.message, true));
   } catch (error) { say(error.message, true); openPanel(); }
   finally { initialized = true; launcher.disabled = false; if (openWhenReady) { openWhenReady = false; openPanel(); } }
   function connectUpdates() {

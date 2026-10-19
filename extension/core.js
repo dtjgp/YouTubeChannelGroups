@@ -114,6 +114,12 @@
         group.name = string(action.name, 40, "分类名称");
         break;
       }
+      case "removeChannel": {
+        const count = state.channels.length;
+        state.channels = state.channels.filter(channel => channel.id !== action.channelId);
+        if (state.channels.length === count) fail("频道已不存在");
+        break;
+      }
       case "deleteGroup":
         state.groups = state.groups.filter(group => group.id !== action.id);
         state.channels.forEach(channel => { channel.groupIds = channel.groupIds.filter(id => id !== action.id); });

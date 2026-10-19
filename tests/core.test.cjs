@@ -103,3 +103,12 @@ test("saved names doubled by the YouTube tooltip are repaired once, other names 
   assert.equal(Core.repairDoubledNames(next).repaired, 0);
   assert.deepEqual(Core.validate(next), next);
 });
+
+test("removing a channel deletes only that channel and rejects unknown ids", () => {
+  const state = {version: 1, groups: [{id: "g", name: "AI"}], channels: [
+    {id: "/@one", title: "One", aliases: ["/@one"], groupIds: ["g"]}, {id: "/@two", title: "Two", aliases: ["/@two"], groupIds: ["g"]}]};
+  const next = Core.reduce(state, {type: "removeChannel", channelId: "/@one"});
+  assert.deepEqual(next.channels.map(channel => channel.id), ["/@two"]);
+  assert.deepEqual(next.groups, state.groups);
+  assert.throws(() => Core.reduce(next, {type: "removeChannel", channelId: "/@one"}), /频道已不存在/);
+});

@@ -1729,3 +1729,71 @@ test('channel names ignore the YouTube hover tooltip; header button switches and
   const scan=await new AxeBuilder({page}).include('#ycg-root').analyze();expect(scan.violations).toEqual([]);
   await page.close();await options.close();await worker.evaluate(()=>chrome.storage.local.clear());
 });
+
+// Signed-in YouTube cannot be loaded in tests, so this imitates its subscribe flow: "已订阅" opens a menu (or,
+// in the older layout, the dialog), "取消订阅" opens yt-confirm-dialog-renderer, and only its confirm button
+// changes the button to "订阅". Confirm clicks record isTrusted: a script click by the extension would be false.
+const fakeSubscriptions=({menu})=>{
+  window.ycgConfirmClicks=[];
+  const popup=()=>document.querySelector('ytd-popup-container')||document.body.appendChild(document.createElement('ytd-popup-container'));
+  const dialog=()=>{popup().innerHTML='<tp-yt-paper-dialog><yt-confirm-dialog-renderer><p>取消订阅该频道？</p><button id="cancel-unsubscribe">取消</button><button id="confirm-unsubscribe">取消订阅</button></yt-confirm-dialog-renderer></tp-yt-paper-dialog>';};
+  document.addEventListener('click',event=>{
+    const subscribe=event.target.closest('#subscribe-button button');
+    if(subscribe&&subscribe.textContent.trim()==='已订阅'){window.ycgTarget=subscribe;if(menu)popup().innerHTML='<tp-yt-iron-dropdown><tp-yt-paper-listbox><tp-yt-paper-item role="menuitem">全部</tp-yt-paper-item><tp-yt-paper-item role="menuitem">取消订阅</tp-yt-paper-item></tp-yt-paper-listbox></tp-yt-iron-dropdown>';else dialog();return;}
+    const item=event.target.closest('ytd-popup-container [role=menuitem]');
+    if(item&&item.textContent.trim()==='取消订阅'){dialog();return;}
+    if(event.target.closest('#confirm-unsubscribe')){window.ycgConfirmClicks.push(event.isTrusted);window.ycgTarget.textContent='订阅';popup().innerHTML='';return;}
+    if(event.target.closest('#cancel-unsubscribe'))popup().innerHTML='';
+  },true);
+  document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('ytd-channel-renderer, ytd-page-header-renderer').forEach(host=>host.insertAdjacentHTML('beforeend','<div id="subscribe-button"><button>已订阅</button></div>'));});
+};
+
+test('unsubscribe: opens YouTube confirmation, leaves the final click to the user, removes on confirm, keeps on cancel',async()=>{
+  await worker.evaluate(()=>chrome.storage.local.set({'ycg.preferences.v1':{language:'zh-CN'}}));
+  const page=await context.newPage();await page.addInitScript(fakeSubscriptions,{menu:true});
+  await page.goto('https://www.youtube.com/feed/channels');
+  await expect.poll(async()=>(await getState())?.channels.length).toBe(3);
+  await page.getByRole('button',{name:'频道分类',exact:true}).click();
+  const panel=page.locator('.panel'),dialog=page.locator('yt-confirm-dialog-renderer');
+  await panel.screenshot({path:path.join(artifacts,'preview-unsubscribe.png')});
+  // Cancel in YouTube: nothing changes.
+  await page.getByRole('button',{name:'取消关注：Beta Music',exact:true}).click();
+  await expect(dialog).toBeVisible();await expect(panel).toBeHidden();
+  await page.locator('#cancel-unsubscribe').click();
+  await expect(page.locator('.status')).toHaveText('未取消关注“Beta Music”：没有在 YouTube 中完成确认');
+  await expect(panel).toBeVisible();expect((await getState()).channels).toHaveLength(3);
+  // Confirm in YouTube: the extension waits for the user and then removes the channel.
+  await page.getByRole('button',{name:'取消关注：Alpha AI',exact:true}).click();
+  await expect(dialog).toBeVisible();await page.waitForTimeout(800);
+  expect((await getState()).channels).toHaveLength(3);
+  await page.locator('#confirm-unsubscribe').click();
+  await expect(page.locator('.status')).toHaveText('已取消关注“Alpha AI”，并已从扩展中移除');
+  expect((await getState()).channels.map(channel=>channel.id)).not.toContain('/@alphaai');
+  // The old card stays on the page with "订阅"; a later scan must not collect it again.
+  await page.evaluate(()=>document.querySelector('main').insertAdjacentHTML('beforeend','<p>触发重新收集</p>'));await page.waitForTimeout(1200);
+  expect((await getState()).channels.map(channel=>channel.id)).not.toContain('/@alphaai');
+  expect(await page.evaluate(()=>window.ycgConfirmClicks)).toEqual([true]);
+  // Already unsubscribed in YouTube: offer to remove the local record only.
+  await page.evaluate(()=>{[...document.querySelectorAll('ytd-channel-renderer')].find(card=>card.textContent.includes('Gamma Code')).querySelector('#subscribe-button button').textContent='订阅';});
+  page.once('dialog',prompt=>{expect(prompt.message()).toContain('YouTube 显示你没有订阅“Gamma Code”');prompt.accept();});
+  await page.getByRole('button',{name:'取消关注：Gamma Code',exact:true}).click();
+  await expect.poll(async()=>(await getState()).channels.map(channel=>channel.id)).toEqual(['/@betamusic']);
+  await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
+});
+
+test('unsubscribe: a channel that is not on the page opens its channel page and continues there',async()=>{
+  await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state,'ycg.preferences.v1':{language:'zh-CN'}}),{version:1,groups:[],channels:[{id:'/@gammacode',title:'Gamma Code',aliases:['/@gammacode'],groupIds:[]}]});
+  const page=await context.newPage();await page.addInitScript(fakeSubscriptions,{menu:false});
+  await page.goto('https://www.youtube.com/feed/subscriptions');
+  await page.getByRole('button',{name:'频道分类',exact:true}).click();
+  await page.getByRole('button',{name:'取消关注：Gamma Code',exact:true}).click();
+  await page.waitForURL('https://www.youtube.com/@gammacode');
+  await expect(page.locator('yt-confirm-dialog-renderer')).toBeVisible();
+  await page.locator('#confirm-unsubscribe').click();
+  await expect(page.locator('.status')).toHaveText('已取消关注“Gamma Code”，并已从扩展中移除');
+  expect((await getState()).channels).toEqual([]);
+  expect(await page.evaluate(()=>window.ycgConfirmClicks)).toEqual([true]);
+  // The pending request is used once: a reload does not reopen the dialog.
+  await page.reload();await page.waitForTimeout(1500);await expect(page.locator('yt-confirm-dialog-renderer')).toHaveCount(0);
+  await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
+});
