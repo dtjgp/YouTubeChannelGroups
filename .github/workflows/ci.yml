@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Syntax and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+
+  macos:
+    name: Native helper and browser tests (macOS)
+    # The native helper is Swift and macOS-only; browser tests also load it via Native Messaging.
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build native helper
+        run: npm run build:native
+      - name: Native helper tests
+        run: npm run test:native
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+      - name: Browser tests
+        run: npm run test:browser
+      - name: Upload browser test output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-output
+          path: |
+            test-results/
+            artifacts/
+            !artifacts/native/
+            !artifacts/*.app/
+          retention-days: 7
+          if-no-files-found: ignore

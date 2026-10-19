@@ -26,21 +26,23 @@
 
 ### 本轮截图
 
+截图副本存于 `docs/images/v0.4/`；原始文件在本机 `artifacts/`，不提交到仓库。
+
 旧分类与设置，顺序对应上述步骤 1–3、4：
 
-![旧分类界面](/Users/dtjgp/Projects/YouTubeChannelGroups/artifacts/audit-v040/01-before-classification.png)
+![旧分类界面](images/v0.4/before-classification.png)
 
-![旧设置界面](/Users/dtjgp/Projects/YouTubeChannelGroups/artifacts/audit-v040/02-before-settings.png)
+![旧设置界面](images/v0.4/before-settings.png)
 
 新版分类和设置，顺序对应步骤 1–3、4：
 
-![英文分类界面](/Users/dtjgp/Projects/YouTubeChannelGroups/artifacts/preview-panel-en.png)
+![英文分类界面](images/v0.4/panel-en.png)
 
-![英文设置界面](/Users/dtjgp/Projects/YouTubeChannelGroups/artifacts/preview-settings-en.png)
+![英文设置界面](images/v0.4/settings-en.png)
 
-![深色设置界面](/Users/dtjgp/Projects/YouTubeChannelGroups/artifacts/preview-settings-dark.png)
+![深色设置界面](images/v0.4/settings-dark.png)
 
-![窄窗口设置界面](/Users/dtjgp/Projects/YouTubeChannelGroups/artifacts/preview-settings-narrow.png)
+![窄窗口设置界面](images/v0.4/settings-narrow.png)
 
 可见标签、焦点样式、原生进度条和状态播报都有实现。没有据此宣称完整的无障碍合规；屏幕阅读器、全键盘长流程及精确对比度测量仍需专项验证。
 
