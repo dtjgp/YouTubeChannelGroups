@@ -140,6 +140,8 @@ $("clear").addEventListener("click", async () => {
     if (config) { provider.value = config.provider; endpoint.value = config.endpoint; model.value = config.model; I.set(secret, "placeholder", config.secretConfigured ? "已保存；留空保留" : "未配置"); phase(4, "设置已保存"); }
     labels();
   } catch (error) { say(error.message, true); }
+  // The fields stay disabled until the saved settings load, so the load cannot overwrite early edits.
+  finally { $("settings-fields").disabled = false; }
 })();
 
 function resetOptions() {

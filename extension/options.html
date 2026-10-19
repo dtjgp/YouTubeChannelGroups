@@ -7,7 +7,7 @@
   <h2>选择你的 AI 助手</h2>
   <p>默认自动分批处理全部剩余频道，每次请求最多 20 个。生成后可统一预览、修改并应用。</p>
   <form id="settings" method="post">
-    <fieldset><legend>AI 连接</legend>
+    <fieldset id="settings-fields" disabled><legend>AI 连接</legend>
     <label for="provider">接入方式</label>
     <select id="provider" name="provider"><option value="codex">本机 Codex（已有命令行登录）</option><option value="claude">本机 Claude（已有命令行登录）</option><option value="api">自定义云端 API（Chat Completions 兼容）</option></select>
     <label for="model">模型名称</label><p id="model-hint" class="hint">本机模式可留空，使用 CLI 默认模型</p><input id="model" name="model" type="text" maxlength="100" placeholder="本机模式可留空，使用 CLI 默认模型" autocomplete="off" aria-describedby="model-hint">
