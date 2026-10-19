@@ -12,7 +12,7 @@
 
 浏览器：Chromium 153.0.8010.12；axe-core 4.14。桌面视口 1800 × 1100，窄视口 320 × 844，设置页 740 × 1000。设置截图为完整页面。
 
-所有截图均在本轮重新捕获并打开检查。原始截图、辅助功能树和扫描 JSON 保存在 `artifacts/web-guidance-audit/{before,after}/`。[来源及下载文件摘要](../artifacts/web-guidance-audit/sources.json)记录参考指南网址、取回时间和 SHA-256，避免依赖后续可能变化的网页内容。
+所有截图均在本轮重新捕获并打开检查。原始截图、辅助功能树和扫描 JSON 保存在本机 `artifacts/web-guidance-audit/{before,after}/`（该目录不提交到仓库）；本文引用的四张修复后截图另存于 `docs/images/web-guidance-audit/`。本机 `artifacts/web-guidance-audit/sources.json` 记录参考指南网址、取回时间和 SHA-256，避免依赖后续可能变化的网页内容。
 
 ## 四步体验检查
 
@@ -24,7 +24,7 @@
 
 限制：多组辅助文字仍然较小；真实默认宽度和长名称下的阅读舒适度，以及实际浏览器缩放需要进一步检查。
 
-![步骤 1：修复后的中文分类面板](/Users/dtjgp/Projects/YouTubeChannelGroups/artifacts/web-guidance-audit/after/01-panel.png)
+![步骤 1：修复后的中文分类面板](images/web-guidance-audit/01-panel.png)
 
 ### 2. 分类审核工作台：已修复，玻璃对比度待验收
 
@@ -34,7 +34,7 @@
 
 限制：不能只凭截图或 axe 检查宣称读屏和语音控制完全可用；仍需辅助技术实测。
 
-![步骤 2：修复后的审核工作台](/Users/dtjgp/Projects/YouTubeChannelGroups/artifacts/web-guidance-audit/after/02-review.png)
+![步骤 2：修复后的审核工作台](images/web-guidance-audit/02-review.png)
 
 ### 3. 英文深色窄屏：重排检查通过，放大及触控待验收
 
@@ -44,7 +44,7 @@
 
 限制：320 像素重排不是实际 200%／400% 浏览器缩放或触屏测试。细边框的替代角目标和方向键仍需人工验收。
 
-![步骤 3：英文深色窄屏](/Users/dtjgp/Projects/YouTubeChannelGroups/artifacts/web-guidance-audit/after/03-narrow-dark.png)
+![步骤 3：英文深色窄屏](images/web-guidance-audit/03-narrow-dark.png)
 
 ### 4. AI 设置与保存：所测流程通过，隐私流程仍有待办
 
@@ -54,7 +54,7 @@
 
 限制：清除 AI 配置不等于删除全部频道数据，也不自动撤销已授予主机权限。完整数据删除入口和保留说明尚未完成；第三方 AI 服务的记录不能由扩展直接控制。
 
-![步骤 4：英文 AI 设置及保存结果](/Users/dtjgp/Projects/YouTubeChannelGroups/artifacts/web-guidance-audit/after/04-settings.png)
+![步骤 4：英文 AI 设置及保存结果](images/web-guidance-audit/04-settings.png)
 
 ## 按规范核对
 

@@ -1,5 +1,22 @@
 # YouTube 频道分类
 
+**YouTube Channel Groups** is a Manifest V3 extension for Chrome, Edge and Brave. It adds a floating panel to the YouTube desktop site so you can sort your subscribed channels into your own categories, then browse or filter loaded subscription videos by category. AI can suggest categories in batches, either through a local Codex or Claude CLI (via a small macOS Native Messaging helper) or through a Chat Completions–compatible API you choose. You review and edit every suggestion before it is applied, and you can undo the last AI application. Channels, categories and settings stay in your browser; there is no telemetry. The UI is available in Chinese and English. Install by loading the `extension/` folder as an unpacked extension (see [安装](#安装) below).
+
+<table>
+  <tr>
+    <td width="40%"><img src="docs/images/readme/panel.png" alt="Floating panel listing collected channels with avatars, search and category filters"></td>
+    <td width="40%"><img src="docs/images/readme/review.png" alt="Classification review workspace with AI-suggested categories, filters and drag-to-categorize cards"></td>
+    <td width="20%"><img src="docs/images/readme/settings-dark-en.png" alt="English settings page in dark mode with AI provider, model and API URL fields"></td>
+  </tr>
+  <tr>
+    <td>Floating channel panel</td>
+    <td>AI classification review</td>
+    <td>Settings (English, dark)</td>
+  </tr>
+</table>
+
+Screenshots come from the isolated test pages in `tests/browser/` with sample channels and a mock AI service; they do not show real accounts or real model output.
+
 在 YouTube 桌面网页中整理你关注的频道，面向 Chrome、Edge 和 Brave。窗口始终悬浮，不挤压网页；支持标题栏拖动、边框缩放、最小化，以及独立拖动并记住小图标位置。点击图标恢复时，窗口仍保持最小化前的位置、大小和未完成编辑。
 
 频道列表与审核显示频道头像。提供 AI 自动分类、自然语言控制分类数量、分类审核拖放、按分类浏览、中英切换、进度与备份导出。玻璃界面的颜色实时跟随 YouTube。Native Messaging 按需启动本机 Codex 或 Claude 小助手；安装后无需手动启动终端或 Python 服务。也可接入自选云端 API。
@@ -261,7 +278,9 @@ npm run test:browser
 npm run package
 ```
 
-源码仓库不包含构建物、依赖目录、浏览器配置或测试截图。macOS 用户首次从源码构建本机小助手与安装器时，需安装 Xcode Command Line Tools、Python 3 和 Node.js，再执行以上构建步骤；生成的安装器和 ZIP 位于 `artifacts/`。浏览器端分类及云端 API 不依赖本机构建。
+源码仓库不包含构建物、依赖目录、浏览器配置或完整测试截图；`docs/images/` 只保存文档引用的精选截图。macOS 用户首次从源码构建本机小助手与安装器时，需安装 Xcode Command Line Tools、Python 3 和 Node.js，再执行以上构建步骤；生成的安装器和 ZIP 位于 `artifacts/`。浏览器端分类及云端 API 不依赖本机构建。
+
+GitHub Actions（`.github/workflows/ci.yml`）在 Ubuntu 上运行语法检查、单元测试和旧桥接测试；在 macOS 上构建本机小助手，再运行原生测试和 Playwright 浏览器测试。真实联网与 VoiceOver 测试需显式环境变量，CI 中保持跳过。
 
 浏览器测试使用 Playwright 和独立临时配置文件，实际加载 Manifest V3 扩展。测试会优先使用本机已有的 Chromium，也可通过 `YCG_CHROMIUM` 指定兼容的 Chromium 可执行文件。如果没有可用浏览器，先执行 `npx playwright install chromium`。
 
@@ -278,3 +297,7 @@ npm run package
 v0.8.0 使用共享设计变量和明确的 CSS 级联层，保留玻璃外框及实时 YouTube 主题。阅读区使用可计算对比度的实色背景，文字至少 4.5:1，控件边框和焦点至少 3:1。频道列表分页和分帧构建，收起时不构建频道卡片。设置页提供字段分组、密钥显示开关和完整数据删除入口。扩展页面启用 Trusted Types，后台只允许加载打包依赖。
 
 可拖动图标的实现和验证见 `docs/draggable-launcher-v0.10.0.md`。最小化与频道头像的实现和验证见 `docs/minimize-avatars-v0.9.0.md`。始终悬浮的更新记录见 `docs/floating-window-v0.8.1.md`；此前的质量整改和剩余人工验收项见 `docs/quality-v0.8.md` 与 `docs/verification.md`。自动扫描及实验室测试不能代替完整规范认证；VoiceOver 和 Edge／Brave 独立实机仍需人工验收。
+
+## 许可证
+
+[MIT](LICENSE)
