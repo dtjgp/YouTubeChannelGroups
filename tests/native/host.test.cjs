@@ -5,15 +5,17 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const os = require("node:os");
 const {once} = require("node:events");
+const crypto = require("node:crypto");
 
 const binary = path.resolve(__dirname, "../../artifacts/native/ycg-native-host");
 const id = "a".repeat(32), origin = `chrome-extension://${id}/`;
-let temporary, config, fake, mode, log;
+let temporary, config, fake, mode, log, hostTmp;
 const payload = provider => ({action: "classify", provider, model: "test-model", data: {groups: [], instructions: "用中文分类", channels: [{id: "/@one", title: "One", description: "音乐教学"}]}});
 const frame = value => { const body = Buffer.from(JSON.stringify(value)); const header = Buffer.alloc(4); header.writeUInt32LE(body.length); return Buffer.concat([header, body]); };
 
 function client(allowedOrigin = origin) {
-  const child = spawn(binary, [allowedOrigin], {env: {...process.env, YCG_NATIVE_CONFIG: config}});
+  // The host's own temporary directory is isolated so leftovers can be checked.
+  const child = spawn(binary, [allowedOrigin], {env: {...process.env, YCG_NATIVE_CONFIG: config, YCG_NATIVE_TMPDIR: hostTmp}});
   let buffer = Buffer.alloc(0), pending = [], replies = [], stderr = "";
   child.stderr.on("data", chunk => { stderr += chunk; });
   child.stdout.on("data", chunk => {
@@ -28,6 +30,7 @@ function client(allowedOrigin = origin) {
 }
 before(async () => {
   temporary = await fs.mkdtemp(path.join(os.tmpdir(), "ycg-native-test-"));
+  hostTmp = path.join(temporary, "host-tmp"); await fs.mkdir(hostTmp);
   config = path.join(temporary, "config.json"); fake = path.join(temporary, "fake-cli"); mode = path.join(temporary, "mode"); log = path.join(temporary, "calls");
   await fs.writeFile(mode, "valid");
   const program = `#!${process.execPath}\nconst fs=require('node:fs'); const args=process.argv.slice(2); const input=fs.readFileSync(0,'utf8'); const mode=fs.readFileSync(${JSON.stringify(mode)},'utf8'); fs.appendFileSync(${JSON.stringify(log)},JSON.stringify({pid:process.pid,args,input})+'\\n'); if(mode==='slow') {setInterval(()=>{},1000);} else {const data=JSON.parse(input.slice(input.indexOf('\\n\\n待分类 JSON：\\n')+15)); const result={suggestions:data.channels.map(channel=>({channelId:channel.id,groups:['音乐'],reason:'模拟分类',certainty:'medium'}))}; const content=mode==='invalid'?'invalid-json':JSON.stringify(result); if(args.includes('--output-last-message'))fs.writeFileSync(args[args.indexOf('--output-last-message')+1],content);else console.log(JSON.stringify({structured_output:result}));}\n`;
@@ -73,12 +76,26 @@ test("disconnect kills an active CLI process group", async () => {
     if (calls.length > previousCalls) { pid = calls.at(-1).pid; break; }
     await new Promise(resolve => setTimeout(resolve, 20));
   }
-  assert.ok(pid); connection.child.stdin.end(); await once(connection.child, "close");
+  assert.ok(pid);
+  // The running request uses the isolated directory, so the check below is not vacuous.
+  assert.equal((await fs.readdir(hostTmp)).filter(name => name.startsWith("ycg-native-")).length, 1);
+  connection.child.stdin.end(); await once(connection.child, "close");
   for (let n = 0; n < 100; n++) {
     try { process.kill(pid, 0); } catch { pid = null; break; }
     await new Promise(resolve => setTimeout(resolve, 20));
   }
   assert.equal(pid, null); await fs.writeFile(mode, "valid");
+  // The prompt with channel data must not survive the disconnect.
+  assert.deepEqual((await fs.readdir(hostTmp)).filter(name => name.startsWith("ycg-native-")), []);
+});
+test("startup removes only old leftover directories", async () => {
+  const old = path.join(hostTmp, "ycg-native-" + crypto.randomUUID().toUpperCase()), fresh = path.join(hostTmp, "ycg-native-" + crypto.randomUUID().toUpperCase()), other = path.join(hostTmp, "ycg-native-notes");
+  for (const directory of [old, fresh, other]) { await fs.mkdir(directory); await fs.writeFile(path.join(directory, "input"), "x"); }
+  const hourAgo = new Date(Date.now() - 3600000); await fs.utimes(old, hourAgo, hourAgo); await fs.utimes(other, hourAgo, hourAgo);
+  const connection = client(); connection.send({action: "status"}); assert.equal((await connection.next()).ok, true);
+  connection.child.stdin.end(); await once(connection.child, "close");
+  await assert.rejects(fs.access(old)); await fs.access(fresh); await fs.access(other);
+  await fs.rm(fresh, {recursive: true}); await fs.rm(other, {recursive: true});
 });
 test("timeout kills a slow CLI and leaves the native protocol usable", async () => {
   await fs.writeFile(mode, "slow");

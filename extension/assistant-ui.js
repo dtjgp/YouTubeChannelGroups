@@ -48,7 +48,7 @@ globalThis.createYCGAssistant = function ({node, button, call, getState, mutate,
       I.set(progress, "textContent", `已完成 ${job.completed} / ${job.total} 个频道。${error.message}。可继续处理剩余 ${job.pending.length} 个，已完成的建议会保留。`);
     }
     finally { clearInterval(timer); running = false; update(); updateElapsed(); }
-  }, {class: "primary"});
+  }, {class: "primary", privileged: true});
   const stop = button("本批完成后停止", () => {
     if (running !== "generate") return;
     stopRequested = true; update();
@@ -71,7 +71,7 @@ globalThis.createYCGAssistant = function ({node, button, call, getState, mutate,
       say("AI 分类建议已应用");
     } catch (error) { I.set(progress, "textContent", error.message); }
     finally { running = false; update(); }
-  }, {disabled: ""});
+  }, {disabled: "", privileged: true});
   const undo = button("撤销上次 AI 分类", async () => {
     if (running || !undoAvailable) return;
     running = true; update();
@@ -82,7 +82,7 @@ globalThis.createYCGAssistant = function ({node, button, call, getState, mutate,
       reviewed.clear(); I.set(progress, "textContent", "上次 AI 分类已撤销。空分类可在管理分类中删除。");
     } catch (error) { I.set(progress, "textContent", error.message); I.set(undoStatus, "textContent", error.message); }
     finally { running = false; update(); }
-  }, {disabled: ""});
+  }, {disabled: "", privileged: true});
   const skip = button("跳过这些建议", () => {
     if (running) return;
     suggestions.forEach(item => reviewed.add(item.channelId)); clearPreview();

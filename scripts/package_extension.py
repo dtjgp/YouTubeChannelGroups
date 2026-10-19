@@ -10,7 +10,7 @@ manifest = json.loads((runtime / "manifest.json").read_text())
 assert json.loads((root / "package.json").read_text())["version"] == manifest["version"]
 lock = json.loads((root / "package-lock.json").read_text())
 assert lock["version"] == lock["packages"][""]["version"] == manifest["version"]
-files = {"design.js", "work.js", "privacy.js", "manifest.json", "background.js", "core.js", "ai.js", "i18n.js", "export.js", "theme.js", "layout.js", "dom.js", "styles.js", "review-ui.js", "organizer-ui.js", "assistant-ui.js", "options.html", "options.js", "options.css", "content.js", *manifest["icons"].values()}
+files = {"design.js", "work.js", "privacy.js", "manifest.json", "background.js", "core.js", "ai.js", "i18n.js", "export.js", "theme.js", "layout.js", "dom.js", "unsubscribe.js", "styles.js", "review-ui.js", "organizer-ui.js", "assistant-ui.js", "options.html", "options.js", "options.css", "content.js", *manifest["icons"].values()}
 references = {
     manifest["background"]["service_worker"],
     *(name for script in manifest["content_scripts"] for name in script["js"]),

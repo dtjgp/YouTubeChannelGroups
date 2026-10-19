@@ -1,6 +1,6 @@
 {
   "name": "youtube-channel-groups",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "private": true,
   "description": "Local YouTube channel categories for Chromium browsers",
   "scripts": {

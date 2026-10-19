@@ -43,7 +43,7 @@ globalThis.createYCGOrganizer = function ({node, button, call, getState, mutate,
       I.set(progress, "textContent", "请检查分类数量与名称，再开始自动归类。此时尚未修改分类。");
     } catch (error) { I.set(progress, "textContent", error.message); }
     finally { endTimer(); meter.hidden = !base; if (base) { meter.max = 1; meter.value = 1; } busy(false); }
-  }, {class: "primary"});
+  }, {class: "primary", privileged: true});
   const classify = button("按方案自动归类全部频道", async () => {
     if (running || !base || stale()) return;
     try {
@@ -68,7 +68,7 @@ globalThis.createYCGOrganizer = function ({node, button, call, getState, mutate,
       say("AI 建议尚未应用，请在预览中确认");
     } catch (error) { I.set(progress, "textContent", `${I.t(error.message)} ${I.t("已有结果保留；可继续剩余频道，或重新规划。")}`); }
     finally { endTimer(); busy(false); }
-  });
+  }, {privileged: true});
   const stop = button("本批完成后停止", () => { stopRequested = true; update(); }, {hidden: ""});
   const apply = button("替换旧分类并应用", async () => {
     if (running || !job || job.pending.length || stale() || applied) return;
@@ -81,7 +81,7 @@ globalThis.createYCGOrganizer = function ({node, button, call, getState, mutate,
       say("精简分类已应用");
     } catch (error) { I.set(progress, "textContent", error.message); }
     finally { busy(false); }
-  }, {class: "primary", disabled: ""});
+  }, {class: "primary", disabled: "", privileged: true});
   const reset = button("重新规划", () => {
     if (running) return;
     plan = []; nameInputs = []; base = null; assignments = []; job = null; applied = false;

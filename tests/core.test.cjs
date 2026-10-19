@@ -119,3 +119,11 @@ test("removing several channels is atomic and rejects a changed list", () => {
   assert.throws(() => Core.reduce(state, {type: "removeChannels", channelIds: ["/@a", "/@gone"]}), /频道列表已变化/);
   assert.throws(() => Core.reduce(state, {type: "removeChannels", channelIds: []}), /请选择要移除的频道/);
 });
+
+test("the saved-name repair runs on install or when updating from a version before 0.12.1", () => {
+  for (const previousVersion of ["0.10.0", "0.11.0", "0.12.0"]) assert.equal(Core.needsNameRepair({reason: "update", previousVersion}), true, previousVersion);
+  for (const previousVersion of ["0.12.1", "0.13.0", "0.14.1", "1.0.0"]) assert.equal(Core.needsNameRepair({reason: "update", previousVersion}), false, previousVersion);
+  assert.equal(Core.needsNameRepair({reason: "install"}), true);
+  assert.equal(Core.needsNameRepair({reason: "chrome_update", previousVersion: "0.10.0"}), false);
+  assert.equal(Core.needsNameRepair(undefined), false);
+});

@@ -68,5 +68,11 @@
     }
     return "cancelled";
   }
-  root.YCGUnsubscribe = {area, status, open, wait};
+  // Channel cards on the list page, except those that already show "Subscribe": YouTube keeps a card
+  // unsubscribed in this page session until the next reload.
+  function subscribedCards(document) {
+    return [...document.querySelectorAll("ytd-channel-renderer, ytd-grid-channel-renderer")]
+      .filter(card => status(card.querySelector(AREA)).state !== "unsubscribed").map(card => Dom.identity(card)).filter(Boolean);
+  }
+  root.YCGUnsubscribe = {area, status, open, wait, subscribedCards};
 })(globalThis);

@@ -36,7 +36,10 @@
     }
     return element;
   }
-  const button = (text, onClick, attributes = {}) => node("button", {type: "button", text, onClick, ...attributes});
+  // The shadow root is open, so YouTube's own scripts can reach these buttons. Actions that spend AI quota,
+  // change subscriptions or remove data ignore synthetic clicks (isTrusted is false for element.click()).
+  const button = (text, onClick, {privileged = false, ...attributes} = {}) => node("button", {type: "button", text, ...attributes,
+    onClick: privileged ? event => { if (event.isTrusted) return onClick(event); } : onClick});
   const link = (text, href, attributes = {}) => node("a", {text, href, ...attributes});
   const css = node("style", {text: globalThis.YCGStyles});
   const pageCss = node("style", {text: "[data-ycg-hidden] { display: none !important; }" + YCGLayout.pageCSS});
@@ -104,7 +107,7 @@
   }}, [createInput, node("button", {type: "submit", class: "primary", text: "创建"})]);
   const collectButton = button("收集已加载频道", () => run(async () => { if (privacy.collectionPaused) privacy = (await call({type: "privacyResume"})).privacy; await scan(true); }, "频道已收集；继续滚动可发现更多"));
   const coverage = node("p", {class: "muted coverage", role: "status", hidden: ""});
-  const loadAllButton = button("自动加载全部订阅", () => loadAllChannels(), {title: "自动滚动订阅频道列表，直到不再加载新频道"});
+  const loadAllButton = button("自动加载全部订阅", () => loadAllChannels(), {privileged: true, title: "自动滚动订阅频道列表，直到不再加载新频道"});
   async function loadAllChannels(trigger = loadAllButton) {
     if (loadingAll) { loadingAll = false; I.set(trigger, "textContent", "正在停止…"); return null; }
     if (location.pathname.replace(/\/$/, "") !== "/feed/channels") { say("请先打开订阅频道列表", true); return null; }
@@ -128,7 +131,7 @@
   }
   // Refresh: load the whole subscription list, then offer to remove saved channels that are no longer in it.
   // Nothing is suggested unless the list reached its end, and nothing is removed without confirmation.
-  const syncButton = button("刷新订阅", () => syncSubscriptions(), {title: "加载完整的订阅列表，找出已取消关注的频道"});
+  const syncButton = button("刷新订阅", () => syncSubscriptions(), {privileged: true, title: "加载完整的订阅列表，找出已取消关注的频道"});
   const syncReview = node("section", {class: "sync-review", "aria-label": "已不在订阅列表中的频道", hidden: ""});
   async function syncSubscriptions() {
     if (loadingAll) { loadAllChannels(syncButton); return; }
@@ -141,17 +144,22 @@
     const result = await loadAllChannels(syncButton);
     if (!result) return;
     if (!result.complete) { showSync(null, "订阅列表没有加载完整，无法判断哪些频道已取消关注。没有移除任何频道；可稍后再次刷新。"); return; }
-    const loaded = await Dom.collectAsync(document, location.pathname, () => true);
-    const present = new Set((loaded || []).flatMap(item => item.aliases));
+    const cards = YCGUnsubscribe.subscribedCards(document);
+    const present = new Set(cards.flatMap(item => item.aliases));
     if (!present.size) { showSync(null, "没有识别到订阅频道。请确认已登录 YouTube；没有移除任何频道。"); return; }
-    const stale = state.channels.filter(channel => !channel.aliases.some(alias => present.has(alias)));
-    showSync(stale, stale.length ? `有 ${stale.length} 个已保存的频道不在你当前的订阅列表中。勾选要从扩展中移除的频道。` : "已刷新：扩展中的频道都仍在订阅列表中。");
+    // A record with no shared address may still be the same channel (for example, a changed handle).
+    const titles = new Map(cards.map(item => [item.title.toLowerCase(), item])), avatars = new Map(cards.filter(item => item.avatarUrl).map(item => [item.avatarUrl, item]));
+    const stale = state.channels.filter(channel => !channel.aliases.some(alias => present.has(alias)))
+      .map(channel => ({channel, twin: titles.get(channel.title.toLowerCase()) || (channel.avatarUrl && avatars.get(channel.avatarUrl)) || null}));
+    showSync(stale, stale.length ? `有 ${stale.length} 个已保存的频道不在你当前的订阅列表中。勾选要从扩展中移除的频道；默认不勾选。` : "已刷新：扩展中的频道都仍在订阅列表中。");
   }
   function showSync(stale, message) {
-    const items = (stale || []).map(channel => {
+    const items = (stale || []).map(({channel, twin}) => {
       const input = node("input", {type: "checkbox", "aria-label": `移除 ${channel.title}`, "data-channel": channel.id});
-      input.checked = true;
-      return node("li", {class: "sync-item"}, [node("label", {class: "row"}, [input, createYCGAvatar(node, channel), node("span", {text: channel.title, localize: false}), node("span", {class: "muted", text: channel.id, localize: false})])]);
+      const notes = [channel.groupIds.length ? `属于 ${channel.groupIds.length} 个分类` : "未分类"];
+      if (twin) notes.push(`可能与列表中的 ${twin.id} 是同一频道（地址已变化），建议保留`);
+      return node("li", {class: "sync-item"}, [node("label", {class: "row"}, [input, createYCGAvatar(node, channel), node("span", {text: channel.title, localize: false}), node("span", {class: "muted", text: channel.id, localize: false})]),
+        node("p", {class: twin ? "muted danger" : "muted", text: notes.map(note => I.t(note)).join(" · "), localize: false})]);
     });
     const children = [node("p", {text: message})];
     if (items.length) {
@@ -163,7 +171,7 @@
             const channelIds = [...syncReview.querySelectorAll("input[data-channel]:checked")].map(input => input.dataset.channel);
             if (!channelIds.length) { say("请先勾选要移除的频道", true); return; }
             run(async () => { await mutate({type: "removeChannels", channelIds}); syncReview.hidden = true; }, `已从扩展中移除 ${channelIds.length} 个频道`);
-          }, {class: "primary"}),
+          }, {class: "primary", privileged: true}),
           button("全部保留", () => { syncReview.hidden = true; say("已保留全部频道"); })
         ]));
     }
@@ -548,7 +556,7 @@
       ])]),
       node("div", {class: "channel-actions"}, [
         link("查看视频 ↗", `https://www.youtube.com${channel.id}/videos`, {class: "channel-videos", target: "_blank", rel: "noopener noreferrer", "aria-label": `查看视频：${channel.title}`}),
-        button("取消关注…", () => unsubscribe(channel), {class: "channel-unsubscribe", "aria-label": `取消关注：${channel.title}`})
+        button("取消关注…", () => unsubscribe(channel), {class: "channel-unsubscribe", privileged: true, "aria-label": `取消关注：${channel.title}`})
       ]),
       state.groups.length ? memberships(channel) : node("p", {class: "muted", text: "先在下方创建分类，再为频道勾选。"})
     ]);
@@ -607,7 +615,7 @@
   function memberships(channel) {
     const build = () => node("div", {class: "memberships"}, state.groups.map(group => {
         const input = node("input", {type: "checkbox", "data-focus-key": `${channel.id}:${group.id}`, "aria-label": `${channel.title}：${group.name}`, onChange: event => {
-          if (busy) { input.checked = channel.groupIds.includes(group.id); say("正在保存，请稍候"); return; }
+          if (!event.isTrusted || busy) { input.checked = channel.groupIds.includes(group.id); if (busy) say("正在保存，请稍候"); return; }
           const checked = event.target.checked;
           run(async () => {
             try { await mutate({type: "membership", channelId: channel.id, groupId: group.id, checked}); }
@@ -703,6 +711,7 @@
               cancelLauncherDrag(); clearTimeout(launcherSaveTimer); launcherSaveTimer = null; launcherSaveId++; layout.setLauncherPosition(null);
               state = Core.empty(); showReview(false); assistantGeneration++; assistant.dispose();
               reviewSurface.replaceChildren(); assistant = makeAssistant(); assistantHome.replaceChildren(assistant.element); assistant.restoreDraft();
+              loadingAll = false; syncReview.replaceChildren(); syncReview.hidden = true; coverage.hidden = true;
               minimized = false; updateLauncher(); layout.setSize(); I.change(I.preferred()); render(); applyFilter();
               say("本机数据已删除，自动收集已暂停");
             }

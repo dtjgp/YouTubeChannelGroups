@@ -247,7 +247,15 @@
     });
     return {state: repaired ? {...state, channels} : state, repaired};
   }
-  const api = {channelMap, KEY, MAX_BYTES, empty, path, avatar, validate, reduce, matches, browse, repairDoubledNames};
+  // An install (an unpacked extension loaded from the command line reports "install" on every start) or an
+  // update from a version that saved doubled names; never a browser update. Deleted data is handled by the caller.
+  function needsNameRepair(details) {
+    if (details?.reason === "install") return true;
+    if (details?.reason !== "update" || typeof details.previousVersion !== "string") return false;
+    const [a = 0, b = 0, c = 0] = details.previousVersion.split(".").map(Number);
+    return a === 0 && (b < 12 || (b === 12 && c < 1));
+  }
+  const api = {channelMap, KEY, MAX_BYTES, empty, path, avatar, validate, reduce, matches, browse, repairDoubledNames, needsNameRepair};
   root.YCGCore = api;
   if (typeof module !== "undefined") module.exports = api;
 })(globalThis);

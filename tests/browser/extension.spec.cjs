@@ -1801,20 +1801,24 @@ test('unsubscribe: a channel that is not on the page opens its channel page and 
 test('refresh subscriptions: opens the full list, offers channels no longer subscribed, removes only confirmed ones',async()=>{
   const saved=(id,title,groupIds=[])=>({id,title,aliases:[id],groupIds});
   await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state,'ycg.preferences.v1':{language:'zh-CN'}}),{version:1,groups:[{id:'g',name:'AI'}],channels:[
-    saved('/@alphaai','Alpha AI',['g']),saved('/@betamusic','Beta Music'),saved('/@gammacode','Gamma Code'),saved('/@gonechannel','Gone Channel',['g']),saved('/@leftchannel','Left Channel')]});
+    saved('/@alphaai','Alpha AI',['g']),saved('/@betamusic','Beta Music'),saved('/@gammacode','Gamma Code'),saved('/@gonechannel','Gone Channel',['g']),saved('/@leftchannel','Left Channel'),
+    saved('/@gammaold','Gamma Code',['g'])]});
   const page=await context.newPage();await page.goto('https://www.youtube.com/feed/subscriptions');
   await page.getByRole('button',{name:'频道分类',exact:true}).click();
   await page.getByRole('button',{name:'刷新订阅',exact:true}).click();
   await page.waitForURL('https://www.youtube.com/feed/channels');
   const review=page.getByRole('region',{name:'已不在订阅列表中的频道'});
-  await expect(review).toContainText('有 2 个已保存的频道不在你当前的订阅列表中',{timeout:20000});
-  expect((await getState()).channels).toHaveLength(5);
-  await expect(page.getByRole('checkbox',{name:'移除 Gone Channel',exact:true})).toBeChecked();
-  await page.getByRole('checkbox',{name:'移除 Left Channel',exact:true}).uncheck();
+  await expect(review).toContainText('有 3 个已保存的频道不在你当前的订阅列表中',{timeout:20000});
+  expect((await getState()).channels).toHaveLength(6);
+  // Nothing is preselected; each item shows what would be lost, and a same-name record is flagged.
+  for (const name of ['Gone Channel','Left Channel','Gamma Code']) await expect(page.getByRole('checkbox',{name:`移除 ${name}`,exact:true})).not.toBeChecked();
+  await expect(review).toContainText('属于 1 个分类');
+  await expect(review).toContainText('可能与列表中的 /@gammacode 是同一频道（地址已变化），建议保留');
+  await page.getByRole('checkbox',{name:'移除 Gone Channel',exact:true}).check();
   await page.locator('.panel').screenshot({path:path.join(artifacts,'preview-refresh-subscriptions.png')});
   await page.getByRole('button',{name:'移除所选频道',exact:true}).click();
   await expect(page.locator('.status')).toHaveText('已从扩展中移除 1 个频道');
-  expect((await getState()).channels.map(channel=>channel.id)).toEqual(['/@alphaai','/@betamusic','/@gammacode','/@leftchannel']);
+  expect((await getState()).channels.map(channel=>channel.id)).toEqual(['/@alphaai','/@betamusic','/@gammacode','/@leftchannel','/@gammaold']);
   await expect(review).toBeHidden();
   const scan=await new AxeBuilder({page}).include('#ycg-root').analyze();expect(scan.violations).toEqual([]);
   await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
@@ -1851,4 +1855,49 @@ test('unsubscribe: an unrecognized YouTube dialog still works because the result
   expect((await getState()).channels).toEqual([]);
   expect(await page.evaluate(()=>window.ycgConfirmClicks)).toEqual([true]);
   await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
+});
+
+test('page scripts cannot trigger privileged panel actions through the open shadow root',async()=>{
+  await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state,'ycg.preferences.v1':{language:'zh-CN'}}),aiSeed);
+  const options=await configureAI('api',mockOrigin+'/v1'),page=await openAssistant();
+  await page.getByLabel('AI 分类范围',{exact:true}).selectOption('all');
+  const before=await getState();aiRequests.length=0;
+  // What a YouTube main-world script could do: find the buttons and call click() or dispatch change events.
+  const clicked=await page.evaluate(()=>{
+    const root=document.getElementById('ycg-root').shadowRoot,labels=['生成分类建议','自动加载全部订阅','刷新订阅','生成精简方案'];
+    const hits=[...root.querySelectorAll('button')].filter(button=>labels.includes(button.textContent.trim())||button.classList.contains('channel-unsubscribe'));
+    hits.forEach(button=>button.click());
+    const box=root.querySelector('.membership input');if(box){box.checked=!box.checked;box.dispatchEvent(new Event('change',{bubbles:true}));}
+    return hits.length;
+  });
+  expect(clicked).toBeGreaterThanOrEqual(4);
+  await page.waitForTimeout(1500);
+  expect(aiRequests).toEqual([]);
+  expect(await getState()).toEqual(before);
+  expect(page.url()).toBe('https://www.youtube.com/feed/subscriptions');
+  await expect(page.locator('.coverage')).toBeHidden();
+  // A real click still works.
+  await page.getByRole('button',{name:'生成分类建议',exact:true}).click();
+  await expect(page.getByLabel('Alpha AI 的建议分类',{exact:true})).toBeVisible();
+  await page.close();await options.close();await worker.evaluate(()=>chrome.storage.local.clear());
+});
+
+test('refresh subscriptions: a card already showing Subscribe counts as unsubscribed; deletion clears the review',async()=>{
+  await worker.evaluate(()=>chrome.storage.local.set({'ycg.preferences.v1':{language:'zh-CN'}}));
+  const page=await context.newPage();await page.goto('https://www.youtube.com/feed/channels');
+  await expect.poll(async()=>(await getState())?.channels.length).toBe(3);
+  // Unsubscribed earlier in this page session: YouTube keeps the card with a "订阅" button until reload.
+  await page.evaluate(()=>document.querySelectorAll('ytd-channel-renderer').forEach(card=>card.insertAdjacentHTML('beforeend',`<div id="subscribe-button"><button>${card.textContent.includes('Beta Music')?'订阅':'已订阅'}</button></div>`)));
+  await page.getByRole('button',{name:'频道分类',exact:true}).click();
+  await page.getByRole('button',{name:'刷新订阅',exact:true}).click();
+  const review=page.getByRole('region',{name:'已不在订阅列表中的频道'});
+  await expect(review).toContainText('有 1 个已保存的频道不在你当前的订阅列表中',{timeout:20000});
+  await expect(page.getByRole('checkbox',{name:'移除 Beta Music',exact:true})).toBeVisible();
+  const options=await context.newPage();await options.goto(new URL('options.html',worker.url()).href);
+  await options.getByRole('button',{name:'删除全部扩展数据…',exact:true}).click();
+  await options.getByRole('checkbox',{name:'我理解将永久删除此浏览器中的全部分类和设置',exact:true}).check();
+  await options.getByRole('button',{name:'确认删除全部数据',exact:true}).click();
+  await expect(options.locator('#privacy-status')).toContainText('本机数据已删除');
+  await expect(review).toBeHidden();await expect(page.locator('.coverage')).toBeHidden();
+  await page.close();await options.close();await worker.evaluate(()=>chrome.storage.local.clear());
 });

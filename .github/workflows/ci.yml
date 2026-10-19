@@ -44,6 +44,9 @@ jobs:
         run: npm run build:native
       - name: Native helper tests
         run: npm run test:native
+      # Fails when a runtime file is missing from the package list or versions disagree.
+      - name: Package extension
+        run: npm run package
       - name: Install Playwright Chromium
         run: npx playwright install chromium --with-deps
       - name: Browser tests

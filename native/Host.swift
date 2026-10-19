@@ -70,6 +70,7 @@ func readExactly(_ count: Int) throws -> Data? {
             guard let calling = args.first else { throw HelperError("只允许浏览器启动小助手") }
             let normalized = calling.hasSuffix("/") ? calling : calling + "/"
             try check(config.origins.contains(normalized), "扩展来源未授权，请重新安装小助手")
+            removeStaleTemporaryDirectories()
             let server = NativeServer(config)
             defer { server.cancel() }
             while let header = try readExactly(4) {

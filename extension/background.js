@@ -17,12 +17,14 @@ const PREFERENCES = "ycg.preferences.v1", UNDO = "ycg.ai.undo.v1", DRAFT = "ycg.
 chrome.tabs.onRemoved.addListener(tabId => { chrome.storage.session.remove([DRAFT + tabId, PENDING + tabId]).catch(() => {}); });
 // One-time repair after an install or update (reloading an unpacked extension also counts).
 const REPAIRS = "ycg.repairs.v1";
-chrome.runtime.onInstalled.addListener(() => { serial(repairSavedNames).catch(() => {}); });
+chrome.runtime.onInstalled.addListener(details => { if (YCGCore.needsNameRepair(details)) serial(repairSavedNames).catch(() => {}); });
 async function repairSavedNames() {
   const stored = await chrome.storage.local.get([YCGCore.KEY, REPAIRS]);
   if (stored[REPAIRS]?.doubledNames) return;
   const updates = {[REPAIRS]: {doubledNames: true}};
-  if (stored[YCGCore.KEY]) {
+  // After a full deletion every saved name was collected by a fixed version, so there is nothing to repair.
+  const deleted = !!YCGPrivacy.normalize((await chrome.storage.local.get(YCGPrivacy.KEY))[YCGPrivacy.KEY]).epoch;
+  if (stored[YCGCore.KEY] && !deleted) {
     const {state, repaired} = YCGCore.repairDoubledNames(YCGCore.validate(stored[YCGCore.KEY]));
     if (repaired) updates[YCGCore.KEY] = state;
   }
