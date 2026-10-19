@@ -1657,3 +1657,30 @@ test('auto-load: scrolls until the subscription list ends, reports coverage, and
   await expect(page.locator('.coverage')).toHaveText('已停止自动加载：已加载 3 个频道，列表可能未完。',{timeout:10000});
   await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
 });
+
+test('channel names ignore the YouTube hover tooltip; header button switches and saves the language',async()=>{
+  // Saved before the fix: the tooltip copy doubled the name. The next collection repairs it.
+  await worker.evaluate(()=>chrome.storage.local.set({'ycg.preferences.v1':{language:'zh-CN'},'ycg.state.v1':{version:1,groups:[],channels:[{id:'/@bytebytego',title:'ByteByteGo ByteByteGo',aliases:['/@bytebytego'],groupIds:[]}]}}));
+  const page=await context.newPage();await page.goto('https://www.youtube.com/feed/channels');
+  await page.evaluate(()=>document.querySelector('main').insertAdjacentHTML('beforeend',
+    '<ytd-channel-renderer><a id="main-link" href="/@bytebytego"><ytd-channel-name id="channel-title"><div id="container"><div id="text-container"><yt-formatted-string id="text">ByteByteGo</yt-formatted-string></div>'+
+    '<tp-yt-paper-tooltip aria-hidden="true" role="tooltip"><div id="tooltip">ByteByteGo</div></tp-yt-paper-tooltip></div></ytd-channel-name></a></ytd-channel-renderer>'));
+  await expect.poll(async()=>(await getState()).channels.find(channel=>channel.id==='/@bytebytego')?.title).toBe('ByteByteGo');
+  await page.getByRole('button',{name:'频道分类',exact:true}).click();
+  const toggle=page.getByRole('button',{name:'EN: Switch to English',exact:true});
+  await expect(toggle).toHaveText('EN');
+  const options=await context.newPage();await options.goto(new URL('options.html',worker.url()).href);
+  await toggle.click();
+  await expect(page.getByRole('button',{name:'中：切换到中文',exact:true})).toHaveText('中');
+  await expect(page.getByRole('button',{name:'Minimize channel window',exact:true})).toBeVisible();
+  await expect(options.getByLabel('Interface language',{exact:true})).toHaveValue('en');
+  await page.locator('.panel').screenshot({path:path.join(artifacts,'preview-language-toggle.png')});
+  expect((await worker.evaluate(()=>chrome.storage.local.get('ycg.preferences.v1')))['ycg.preferences.v1'].language).toBe('en');
+  const box=await page.locator('.panel').boundingBox();
+  await page.getByRole('button',{name:'中：切换到中文',exact:true}).click();
+  await expect(page.getByRole('button',{name:'EN: Switch to English',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'最小化分类窗口',exact:true})).toBeVisible();
+  expect(await page.locator('.panel').boundingBox()).toEqual(box);
+  const scan=await new AxeBuilder({page}).include('#ycg-root').analyze();expect(scan.violations).toEqual([]);
+  await page.close();await options.close();await worker.evaluate(()=>chrome.storage.local.clear());
+});

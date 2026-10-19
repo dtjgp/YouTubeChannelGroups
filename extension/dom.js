@@ -21,6 +21,15 @@
     }
     return null;
   }
+  // ytd-channel-name repeats the name in a hidden hover tooltip; textContent would return it twice.
+  function nameText(node) {
+    if (!node) return "";
+    const source = node.matches("yt-formatted-string") ? node : node.querySelector("yt-formatted-string#text") || node;
+    const walker = source.ownerDocument.createTreeWalker(source, 4);
+    let text = "";
+    while (walker.nextNode()) if (!walker.currentNode.parentElement?.closest("tp-yt-paper-tooltip, [role=tooltip]")) text += walker.currentNode.nodeValue;
+    return text.trim();
+  }
   function identity(element) {
     const allLinks = [...element.querySelectorAll("a[href]")].map(link => ({link, path: Core.path(link.getAttribute("href"))})).filter(item => item.path);
     const preferred = allLinks.filter(({link}) => link.matches("#main-link, #channel-title, #avatar, #channel-thumbnail, #channel-name a, ytd-channel-name a, .yt-lockup-metadata-view-model__metadata a, .yt-content-metadata-view-model__metadata-row a"));
@@ -29,7 +38,7 @@
     if (!links.length) return null;
     const named = links.find(({link}) => link.matches("#main-link, #channel-title, #channel-name a, .yt-lockup-metadata-view-model__metadata a, .yt-content-metadata-view-model__metadata-row a") && link.textContent.trim()) || links.find(({link}) => link.textContent.trim());
     const titleNode = element.querySelector("#channel-title, #channel-name, yt-formatted-string#text");
-    const title = (titleNode?.textContent || named?.link.textContent || links[0].path).trim().replace(/\s+/g, " ").slice(0, 200);
+    const title = (nameText(titleNode) || nameText(named?.link) || links[0].path).trim().replace(/\s+/g, " ").slice(0, 200);
     const description = element.querySelector("#description, #description-container")?.textContent.trim().replace(/\s+/g, " ").slice(0, 600) || "";
     const avatarUrl = avatarFrom(element, "#avatar img, #channel-thumbnail img, #main-link img, yt-avatar-shape img, .yt-spec-avatar-shape__image");
     return {id: links[0].path, title, aliases: [...new Set(links.map(item => item.path))], description, ...(avatarUrl ? {avatarUrl} : {})};

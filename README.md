@@ -1,6 +1,6 @@
 # YouTube 频道分类
 
-**YouTube Channel Groups** is a Manifest V3 extension for Chrome, Edge and Brave. It adds a floating panel to the YouTube desktop site so you can sort your subscribed channels into your own categories, then browse or filter loaded subscription videos by category. AI can suggest categories in batches, either through a local Codex or Claude CLI (via a small macOS Native Messaging helper) or through a Chat Completions–compatible API you choose. You review and edit every suggestion before it is applied, and you can undo the last AI application. Channels, categories and settings stay in your browser; there is no telemetry. The UI is available in Chinese and English. Install by loading the `extension/` folder as an unpacked extension (see [安装](#安装) below).
+**YouTube Channel Groups** is a Manifest V3 extension for Chrome, Edge and Brave. It adds a floating panel to the YouTube desktop site so you can sort your subscribed channels into your own categories, then browse or filter loaded subscription videos by category. AI can suggest categories in batches, either through a local Codex or Claude CLI (via a small macOS Native Messaging helper) or through a Chat Completions–compatible API you choose. You review and edit every suggestion before it is applied, and you can undo the last AI application. Channels, categories and settings stay in your browser; there is no telemetry. The UI is available in Chinese and English: it follows the browser language until you pick one with the 中/EN button in the panel header. Other conveniences: one click auto-scrolls the subscription list to collect every channel and reports whether the list ended; unapplied AI suggestions survive a reload of the same tab; `Alt+Shift+Y` opens or minimizes the panel. Install by loading the `extension/` folder as an unpacked extension (see [安装](#安装) below).
 
 <table>
   <tr>
@@ -41,7 +41,12 @@ cd YouTubeChannelGroups
 
 已安装本机 `extension` 目录的用户：在扩展管理页面点击该扩展的刷新按钮，再刷新 YouTube。加载 ZIP 副本的用户，应先导出备份，再更新同一个扩展目录。不要把新版作为另一个扩展安装，否则两者的数据不会共享。
 
-从旧版本更新至 v0.11.0 只需刷新同一个扩展，无须重新安装本机小助手。更新后浏览器会提示新增的快捷键；若之前未在“AI 设置”中选择过界面语言，界面将改为跟随浏览器语言。
+从旧版本更新至 v0.12.0 只需刷新同一个扩展，无须重新安装本机小助手。若之前未选择过界面语言，界面将改为跟随浏览器语言；可用面板标题栏的“中／EN”按钮切换。
+
+## 最近更新
+
+- **v0.12.0**：面板标题栏新增“中／EN”语言切换按钮，选择立即保存，并同步到其他 YouTube 标签页和设置页。修复频道名称重复显示（如“ByteByteGo ByteByteGo”）：YouTube 在频道名旁放了一份隐藏的悬停提示文字，旧版本把它也读进了名称。已保存的重复名称会在下次收集时被正确名称覆盖：打开订阅频道列表，点击“自动加载全部订阅”即可。
+- **v0.11.0**：一键自动加载全部订阅并显示是否已到列表底部；未应用的 AI 分类建议在同一标签页刷新后恢复；`Alt+Shift+Y` 打开或最小化窗口；首次使用时界面语言跟随浏览器；移除不再使用的 v0.2 HTTP 桥接。
 
 ## 键盘快捷键
 
@@ -158,7 +163,7 @@ JSON 备份保留头像地址，仍可读取没有头像字段的旧备份。CSV
 
 ### 中英界面与设置进度
 
-首次使用时，界面语言跟随浏览器首选语言：中文浏览器显示中文，其他语言显示英文。在“AI 设置”顶部选择“中文”或“English”后，以你的选择为准。语言立即保存，同一浏览器配置文件中已打开的 YouTube 分类面板会同步切换。未保存的模型、地址和分类预览不会因切换语言被清空。用户已有分类名称和频道名称保留原文；已生成的模型说明也保留原文。新任务会要求模型使用任务开始时的界面语言，用户仍可在分类要求中指定语言。
+首次使用时，界面语言跟随浏览器首选语言：中文浏览器显示中文，其他语言显示英文。点击分类面板标题栏的“中／EN”按钮，或在“AI 设置”顶部选择“中文”或“English”后，以你的选择为准。按钮显示的是将要切换到的语言。语言立即保存，同一浏览器配置文件中已打开的 YouTube 分类面板会同步切换。未保存的模型、地址和分类预览不会因切换语言被清空。用户已有分类名称和频道名称保留原文；已生成的模型说明也保留原文。新任务会要求模型使用任务开始时的界面语言，用户仍可在分类要求中指定语言。
 
 设置页会显示当前接入方式、模型和服务主机，密钥不进入摘要。编辑后显示“尚未保存”；保存依次显示验证、主机授权（云端）、本机保存和完成。进度代表已执行的阶段，不代表网络速度。保存期间重复提交和字段编辑会被阻止。
 

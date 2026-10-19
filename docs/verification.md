@@ -427,3 +427,8 @@ Chrome 注册文件：
 - 自动加载：示例页面模拟 YouTube 的续载项，滚动三次后续载项消失，显示“已到列表底部：已收集全部 18 个订阅频道”，并恢复滚动位置；续载停滞时可手动停止，显示“列表可能未完”。
 
 限制：自动加载依据 `ytd-continuation-item-renderer` 判断是否还有更多频道，尚未在真实 YouTube 订阅列表上实测；每轮等待 1.2 秒，大量订阅时耗时随之增加。语言默认值的英文分支只有单元测试，没有英文浏览器区域的集成测试。精简分类方案仍不支持刷新恢复。
+
+## v0.12.0 名称修复与语言按钮验证
+
+- 原因核对：在内置浏览器打开匿名 YouTube 频道搜索结果，读取第一个 `ytd-channel-renderer`。`#channel-title` 的 `textContent` 含两次 “ByteByteGo”，第二次位于 `tp-yt-paper-tooltip`；`yt-formatted-string#text` 只含一次。订阅频道列表需要登录，未直接检查，但使用同一 `ytd-channel-renderer` 组件（推断）。
+- 浏览器测试：按上述真实结构构造频道卡片；已保存的 “ByteByteGo ByteByteGo” 在收集后变为 “ByteByteGo”。标题栏按钮在中英之间切换，偏好写入存储，设置页同步为 English，面板位置不变，axe 扫描无违规。首次扫描发现按钮可访问名称不含可见文字（label-content-name-mismatch），已改为以可见文字开头。

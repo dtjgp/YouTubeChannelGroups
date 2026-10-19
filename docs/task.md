@@ -173,3 +173,10 @@
 - 边界：不调用真实模型，不发布或推送。
 
 状态：见 `verification.md` 中 v0.11.0 一节。
+
+## 名称修复与语言按钮 v0.12.0
+
+- 目标：修复频道名称重复显示；在面板中直接切换中英文。
+- 原因：真实 YouTube 页面中 `ytd-channel-name#channel-title` 内含隐藏的 `tp-yt-paper-tooltip`，其中重复一份频道名；旧代码读取整个元素的 `textContent`。
+- 范围：读取名称时优先使用 `yt-formatted-string#text` 并排除提示框文字；已保存名称依靠下次收集覆盖，不做“X X”启发式修复（会误改“Duran Duran”这类真实名称）。标题栏新增语言按钮，复用现有偏好保存与跨标签同步。
+- 验证与状态：见 `verification.md` v0.12.0 一节。

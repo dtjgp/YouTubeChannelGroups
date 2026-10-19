@@ -66,6 +66,22 @@
   const minimizePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
   for (const [key, value] of Object.entries({d: "M5 10h10", fill: "none", stroke: "currentColor", "stroke-width": "2", "stroke-linecap": "round"})) minimizePath.setAttribute(key, value);
   minimizeIcon.append(minimizePath); minimize.append(minimizeIcon);
+  // Shows the target language. The choice is saved and syncs to other tabs and the settings page.
+  const languageToggle = node("button", {type: "button", class: "window-control language-toggle", lang: "en", localize: false, onClick: async () => {
+    const next = I.language === "en" ? "zh-CN" : "en";
+    languageToggle.disabled = true;
+    try { I.change((await call({type: "preferencesSave", preferences: {language: next}})).preferences.language); say("界面语言已保存"); }
+    catch (error) { say(error.message, true); }
+    finally { languageToggle.disabled = false; }
+  }});
+  function updateLanguageToggle() {
+    const english = I.language === "en";
+    languageToggle.textContent = english ? "中" : "EN"; languageToggle.lang = english ? "zh-CN" : "en";
+    // The accessible name starts with the visible text (WCAG 2.5.3 label in name).
+    languageToggle.setAttribute("aria-label", english ? "中：切换到中文" : "EN: Switch to English");
+    languageToggle.title = english ? "切换到中文" : "Switch to English";
+  }
+  updateLanguageToggle();
   const close = node("button", {type: "button", onClick: () => closePanel(), class: "close", "aria-label": "关闭分类面板"});
   const closeIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   for (const [key, value] of Object.entries({viewBox: "0 0 20 20", width: "20", height: "20", "aria-hidden": "true", focusable: "false"})) closeIcon.setAttribute(key, value);
@@ -139,7 +155,7 @@
   const head = node("header", {class: "head", role: "group", tabindex: "0", "aria-describedby": "ycg-window-help", "aria-label": "移动面板：拖动标题栏或使用方向键", title: "拖动标题栏移动；双击恢复默认位置"}, [node("div", {}, [
       node("p", {class: "eyebrow", text: "YouTube"}),
       node("h2", {text: "频道分类"}), layoutLabel
-    ]), node("div", {class: "head-actions"}, [minimize, close])]);
+    ]), node("div", {class: "head-actions"}, [languageToggle, minimize, close])]);
   panel.append(head,
     node("div", {class: "body"}, [link("跳到频道列表", "#ycg-channels", {class: "skip-link", onClick: event => { event.preventDefault(); channelList.focus(); }}),
       node("div", {class: "intro"}, [node("strong", {text: "从你的订阅频道开始"}), node("p", {text: "打开订阅列表，滚动加载频道。扩展会收集已加载的频道；然后在下方勾选分类。"}),
@@ -553,7 +569,7 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  I.onChange(() => { host.lang = I.language; I.refresh(shadow); render(); assistant.localize(); });
+  I.onChange(() => { host.lang = I.language; I.refresh(shadow); updateLanguageToggle(); render(); assistant.localize(); });
   try {
     privacy = (await call({type: "privacyGet"})).privacy;
     I.set(collectButton, "textContent", privacy.collectionPaused ? "恢复收集已加载频道" : "收集已加载频道");

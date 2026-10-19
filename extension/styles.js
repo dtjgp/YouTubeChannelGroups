@@ -51,6 +51,7 @@ p { margin: 0; }
 .channel-pagination { display: flex; align-items: center; justify-content: space-between; gap: var(--ycg-gap); margin-block: 10px; }
 .channel-memberships { margin-block: 8px; padding-block: 0; border: 0; }
 .muted { color: var(--muted-text); font-size: var(--ycg-small); }
+.language-toggle { font-size: .75rem; font-weight: 600; letter-spacing: .02em; }
 .close, .window-control { color: var(--raised-text); border: none; padding: 3px 7px; min-width: 30px; min-height: 30px; display: grid; place-items: center; background: var(--raised); border-radius: 50%; }
 .body { background: var(--surface); overflow: auto; overscroll-behavior: contain; flex: 1; min-height: 0; scroll-padding-block: 12px; padding: 15px 16px; }
 .links { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 12px; }
