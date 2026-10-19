@@ -470,6 +470,13 @@
     if (restoreFocus && !document.fullscreenElement) launcher.focus({preventScroll: true});
   }
   shadow.addEventListener("keydown", event => { if (event.key === "Escape" && !panel.hidden) { event.stopPropagation(); if (resizeSession) cancelResize(); else closePanel(); } });
+  // Keep the field being edited in view when the panel or the channel list changes size. A search that
+  // shortens the list can shrink the panel and clamp its scroll position after the focus handler ran.
+  const keepEditingVisible = new ResizeObserver(() => {
+    const editing = shadow.activeElement;
+    if (!panel.hidden && editing?.matches("input:not([type=checkbox]), textarea, select")) editing.scrollIntoView({block: "nearest", inline: "nearest"});
+  });
+  for (const target of [panel, shadow.querySelector(".body"), channelList]) keepEditingVisible.observe(target);
   shadow.addEventListener("focusin", event => {
     const input = event.target;
     if (!input.matches("input, select, textarea, button, summary, a, [tabindex]")) return;
