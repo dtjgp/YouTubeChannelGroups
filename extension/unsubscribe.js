@@ -32,7 +32,9 @@
     if (buttons.some(button => SUBSCRIBE.test(text(button)))) return {state: "unsubscribed"};
     return {state: "unknown"};
   }
-  function dialog(document) { return [...document.querySelectorAll("yt-confirm-dialog-renderer")].find(visible) || null; }
+  // YouTube has used several dialog elements. The panel lives in a shadow root, so these never match it.
+  const DIALOG = "yt-confirm-dialog-renderer, tp-yt-paper-dialog, yt-dialog-view-model, dialog[open], [role=dialog], [role=alertdialog]";
+  function dialog(document) { return [...document.querySelectorAll(DIALOG)].find(visible) || null; }
   function menuItem(document) {
     return [...document.querySelectorAll("ytd-popup-container :is([role=menuitem], tp-yt-paper-item, yt-list-item-view-model, ytd-menu-service-item-renderer)")]
       .find(item => visible(item) && UNSUBSCRIBE.test(text(item))) || null;
@@ -42,22 +44,25 @@
     return null;
   }
   // Older YouTube opens the dialog directly; newer YouTube first opens a menu with an "Unsubscribe" item.
+  // Returns the dialog, or null when YouTube's confirmation uses markup that is not recognized: the caller
+  // then waits for the button state alone, because the user may still confirm in that dialog.
   async function open(document, button) {
+    const menu = () => { const item = menuItem(document); return item && !item.closest(DIALOG) ? item : null; };
     button.click();
-    const first = await until(() => dialog(document) || menuItem(document), 5000);
+    const first = await until(() => menu() || dialog(document), 5000);
     if (!first) throw new Error("未能打开 YouTube 的取消订阅菜单。请在 YouTube 中手动取消订阅。");
-    if (first.matches("yt-confirm-dialog-renderer")) return first;
+    if (first !== menuItem(document)) return first;
     first.click();
-    const confirmation = await until(() => dialog(document), 5000);
-    if (!confirmation) throw new Error("未能打开 YouTube 的确认框。请在 YouTube 中手动取消订阅。");
-    return confirmation;
+    return until(() => dialog(document), 5000);
   }
-  // "done" after YouTube shows the subscribe state again; "cancelled" when the dialog closes without it.
-  async function wait(document, findArea, {timeout = 120000, signal} = {}) {
+  // The result comes from the subscribe button, not the dialog: "done" once YouTube shows "Subscribe" again.
+  // "cancelled" when a recognized dialog closed without that change, or after the timeout.
+  async function wait(document, findArea, {timeout = 120000, signal, seenDialog = false} = {}) {
     for (const end = Date.now() + timeout; Date.now() < end && !signal?.aborted; await pause(250)) {
       if (status(findArea()).state === "unsubscribed") return "done";
-      if (!dialog(document)) {
-        const settled = await until(() => status(findArea()).state === "unsubscribed", 1500);
+      if (dialog(document)) { seenDialog = true; continue; }
+      if (seenDialog) {
+        const settled = await until(() => status(findArea()).state === "unsubscribed", 3000);
         return settled ? "done" : "cancelled";
       }
     }

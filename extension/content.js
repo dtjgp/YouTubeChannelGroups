@@ -572,14 +572,14 @@
     const epoch = privacy.epoch;
     try {
       say("正在打开 YouTube 的取消订阅确认框…");
-      await YCGUnsubscribe.open(document, current.button);
+      const confirmation = await YCGUnsubscribe.open(document, current.button);
       // Move the panel aside so that YouTube's dialog is not covered.
       if (!panel.hidden) minimizePanel();
       say(`请在 YouTube 的确认框中确认取消订阅“${channel.title}”`);
-      const result = await YCGUnsubscribe.wait(document, findArea);
+      const result = await YCGUnsubscribe.wait(document, findArea, {seenDialog: !!confirmation});
       if (epoch !== privacy.epoch) return;
       if (minimized) openPanel();
-      if (result !== "done") { say(`未取消关注“${channel.title}”：没有在 YouTube 中完成确认`, true); return; }
+      if (result !== "done") { say(`未检测到“${channel.title}”已取消关注，扩展中的记录保持不变。如果你已在 YouTube 中确认，请点击“刷新订阅”同步。`, true); return; }
       try { await forget(channel); say(`已取消关注“${channel.title}”，并已从扩展中移除`); }
       catch (error) { say(`已在 YouTube 取消关注“${channel.title}”，但未能从扩展中移除：${error.message}`, true); }
     } catch (error) { say(error.message, true); }

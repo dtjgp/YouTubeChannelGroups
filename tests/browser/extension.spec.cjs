@@ -1733,10 +1733,10 @@ test('channel names ignore the YouTube hover tooltip; header button switches and
 // Signed-in YouTube cannot be loaded in tests, so this imitates its subscribe flow: "已订阅" opens a menu (or,
 // in the older layout, the dialog), "取消订阅" opens yt-confirm-dialog-renderer, and only its confirm button
 // changes the button to "订阅". Confirm clicks record isTrusted: a script click by the extension would be false.
-const fakeSubscriptions=({menu})=>{
+const fakeSubscriptions=({menu,dialogTag='yt-confirm-dialog-renderer'})=>{
   window.ycgConfirmClicks=[];
   const popup=()=>document.querySelector('ytd-popup-container')||document.body.appendChild(document.createElement('ytd-popup-container'));
-  const dialog=()=>{popup().innerHTML='<tp-yt-paper-dialog><yt-confirm-dialog-renderer><p>取消订阅该频道？</p><button id="cancel-unsubscribe">取消</button><button id="confirm-unsubscribe">取消订阅</button></yt-confirm-dialog-renderer></tp-yt-paper-dialog>';};
+  const dialog=()=>{popup().innerHTML=`<${dialogTag}><p>取消订阅该频道？</p><button id="cancel-unsubscribe">取消</button><button id="confirm-unsubscribe">取消订阅</button></${dialogTag}>`;};
   document.addEventListener('click',event=>{
     const subscribe=event.target.closest('#subscribe-button button');
     if(subscribe&&subscribe.textContent.trim()==='已订阅'){window.ycgTarget=subscribe;if(menu)popup().innerHTML='<tp-yt-iron-dropdown><tp-yt-paper-listbox><tp-yt-paper-item role="menuitem">全部</tp-yt-paper-item><tp-yt-paper-item role="menuitem">取消订阅</tp-yt-paper-item></tp-yt-paper-listbox></tp-yt-iron-dropdown>';else dialog();return;}
@@ -1760,7 +1760,7 @@ test('unsubscribe: opens YouTube confirmation, leaves the final click to the use
   await page.getByRole('button',{name:'取消关注：Beta Music',exact:true}).click();
   await expect(dialog).toBeVisible();await expect(panel).toBeHidden();
   await page.locator('#cancel-unsubscribe').click();
-  await expect(page.locator('.status')).toHaveText('未取消关注“Beta Music”：没有在 YouTube 中完成确认');
+  await expect(page.locator('.status')).toHaveText('未检测到“Beta Music”已取消关注，扩展中的记录保持不变。如果你已在 YouTube 中确认，请点击“刷新订阅”同步。');
   await expect(panel).toBeVisible();expect((await getState()).channels).toHaveLength(3);
   // Confirm in YouTube: the extension waits for the user and then removes the channel.
   await page.getByRole('button',{name:'取消关注：Alpha AI',exact:true}).click();
@@ -1831,5 +1831,24 @@ test('refresh subscriptions: an incomplete list suggests nothing',async()=>{
   await expect(page.getByRole('region',{name:'已不在订阅列表中的频道'})).toContainText('订阅列表没有加载完整，无法判断哪些频道已取消关注。',{timeout:10000});
   await expect(page.getByRole('button',{name:'移除所选频道',exact:true})).toHaveCount(0);
   expect((await getState()).channels.map(channel=>channel.id)).toContain('/@gonechannel');
+  await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
+});
+
+test('unsubscribe: an unrecognized YouTube dialog still works because the result comes from the button state',async()=>{
+  await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state,'ycg.preferences.v1':{language:'zh-CN'}}),{version:1,groups:[],channels:[{id:'/@gammacode',title:'Gamma Code',aliases:['/@gammacode'],groupIds:[]}]});
+  // A dialog element the extension does not know, without a dialog role, reached from the channel page.
+  const page=await context.newPage();await page.addInitScript(fakeSubscriptions,{menu:true,dialogTag:'ycg-unknown-confirm'});
+  await page.goto('https://www.youtube.com/feed/subscriptions');
+  await page.getByRole('button',{name:'频道分类',exact:true}).click();
+  await page.getByRole('button',{name:'取消关注：Gamma Code',exact:true}).click();
+  await page.waitForURL('https://www.youtube.com/@gammacode');
+  await expect(page.locator('#confirm-unsubscribe')).toBeVisible();
+  // Longer than the old 5-second give-up: the extension must still be waiting.
+  await page.waitForTimeout(6000);
+  expect((await getState()).channels).toHaveLength(1);
+  await page.locator('#confirm-unsubscribe').click();
+  await expect(page.locator('.status')).toHaveText('已取消关注“Gamma Code”，并已从扩展中移除');
+  expect((await getState()).channels).toEqual([]);
+  expect(await page.evaluate(()=>window.ycgConfirmClicks)).toEqual([true]);
   await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
 });
