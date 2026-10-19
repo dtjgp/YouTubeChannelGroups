@@ -223,11 +223,10 @@
         node("li", {text: "在“管理分类”中创建分类并勾选频道，或展开“AI 分类助手”自动分类。"}),
         node("li", {text: "在“订阅视频”页面点击分类，筛选要看的视频。"})
       ])]),
-      node("div", {class: "tools"}, [syncButton, collectButton, currentButton]), coverage, syncReview,
+      node("div", {class: "tools"}, [syncButton, collectButton, currentButton]), assistantHome, coverage, syncReview,
       node("p", {class: "section-label", text: "我的分类"}), node("div", {class: "category-tools"}, [chips, reset]), feedStatus, feedLink,
       manageGroups,
-      node("label", {class: "control-label", for: "ycg-channel-search", text: "搜索频道"}), searchInput, count, channelList, channelPagination,
-      assistantHome
+      node("label", {class: "control-label", for: "ycg-channel-search", text: "搜索频道"}), searchInput, count, channelList, channelPagination
     ]),
     node("footer", {class: "footer"}, [node("details", {class: "footer-menu"}, [node("summary", {text: "备份与数据"}), node("div", {class: "tools"}, [
       exportFormat, button("导出备份", () => run(exportState, "备份已生成")),

@@ -2,6 +2,10 @@
 
 版本号同时写在 `extension/manifest.json`、`package.json` 和 `package-lock.json`。本机小助手（Native Messaging helper）单独编号，当前为 0.3.0；它的变更在对应版本中注明，需要重新运行安装器才会更新。
 
+## v0.15.1
+
+- “AI 分类助手”移到“刷新订阅”正下方。
+
 ## v0.15.0
 
 界面整理（全局检查 P1）与发布准备（P2）。
