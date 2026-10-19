@@ -57,6 +57,30 @@
       return {channelId: item.channelId, groups, reason: item.reason, certainty: item.certainty};
     });
   }
+  // Unapplied suggestion drafts survive a reload of the same tab. Restored data is untrusted:
+  // keep only known channels and well-formed fields; apply still runs full state validation.
+  function draft(value, channelIds) {
+    const known = new Set(channelIds);
+    if (!value || value.version !== 1 || !Array.isArray(value.suggestions) || value.suggestions.length > 10000) return null;
+    const ids = list => Array.isArray(list) ? [...new Set(list.filter(id => known.has(id)))] : [];
+    const seen = new Set();
+    const suggestions = value.suggestions.filter(item => item && known.has(item.channelId) && !seen.has(item.channelId) && seen.add(item.channelId)).map(item => ({
+      channelId: item.channelId,
+      groups: [...new Set((Array.isArray(item.groups) ? item.groups : []).filter(name => typeof name === "string" && name.trim() && name.trim().length <= 40).map(name => name.trim()))].slice(0, 20),
+      reason: typeof item.reason === "string" ? item.reason.slice(0, 500) : "",
+      certainty: ["low", "medium", "high"].includes(item.certainty) ? item.certainty : "low",
+      selected: item.selected === true, ...(item.reviewed === true ? {reviewed: true} : {})
+    }));
+    const job = value.job;
+    const pending = ids(job?.pending).filter(id => !seen.has(id));
+    if (!suggestions.length && !pending.length) return null;
+    const total = suggestions.length + pending.length;
+    return {
+      version: 1, suggestions, reviewed: ids(value.reviewed),
+      scope: value.scope === "all" ? "all" : "unassigned", applyMode: value.applyMode === "replace" ? "replace" : "add",
+      job: {pending, total, completed: total - pending.length, instructions: typeof job?.instructions === "string" ? job.instructions.slice(0, 900) : "", language: job?.language === "en" ? "en" : "zh-CN"}
+    };
+  }
   const PLAN_IDS = Array.from({length: 20}, (_, index) => `/ycg-category/${index + 1}`);
   function countRule(text) {
     const number = "(?:[0-9]{1,3}|[一二两三四五六七八九十]{1,3})", ending = "(?:个\\s*)?(?:大\\s*)?(?:类别|分类|类|categories?|groups?)";
@@ -109,7 +133,7 @@
       return canonical.get(name.toLowerCase());
     })}));
   }
-  const api = {SETTINGS_KEY, BATCH, NATIVE_HOST, SYSTEM, schema, settings, publicSettings, originPattern, requestData, prompt, parse, countRule, taxonomyNames, planData, parsePlan, parseFixed};
+  const api = {SETTINGS_KEY, BATCH, NATIVE_HOST, SYSTEM, schema, draft, settings, publicSettings, originPattern, requestData, prompt, parse, countRule, taxonomyNames, planData, parsePlan, parseFixed};
   root.YCGAI = api;
   if (typeof module !== "undefined") module.exports = api;
 })(globalThis);

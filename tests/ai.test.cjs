@@ -93,3 +93,25 @@ test("reclassification replaces only selected memberships and supports conflict-
   assert.equal(JSON.stringify(edited), snapshot);
   assert.throws(() => Core.reduce(state, {type: "applySuggestions", mode: "invalid", suggestions: [suggestion()]}));
 });
+
+test("restored AI drafts keep only known channels and well-formed fields", () => {
+  const AI = require("../extension/ai.js");
+  const ids = ["/@one", "/@two", "/@three"];
+  const draft = AI.draft({version: 1, scope: "all", applyMode: "replace", reviewed: ["/@one", "/@gone"],
+    suggestions: [
+      {channelId: "/@one", groups: [" AI ", "AI", "", "x".repeat(41), 7], reason: "r", certainty: "high", selected: true, reviewed: true},
+      {channelId: "/@one", groups: ["dup"], reason: "", certainty: "high"},
+      {channelId: "/@gone", groups: ["X"], reason: "", certainty: "high", selected: true},
+      {channelId: "/@two", groups: ["音乐"], reason: 5, certainty: "bogus", selected: "yes"}
+    ],
+    job: {pending: ["/@three", "/@gone", "/@one"], total: 99, completed: 1, instructions: "要求", language: "en"}}, ids);
+  assert.deepEqual(draft.suggestions, [
+    {channelId: "/@one", groups: ["AI"], reason: "r", certainty: "high", selected: true, reviewed: true},
+    {channelId: "/@two", groups: ["音乐"], reason: "", certainty: "low", selected: false}
+  ]);
+  assert.deepEqual(draft.job, {pending: ["/@three"], total: 3, completed: 2, instructions: "要求", language: "en"});
+  assert.deepEqual([draft.scope, draft.applyMode, draft.reviewed], ["all", "replace", ["/@one"]]);
+  assert.equal(AI.draft({version: 1, suggestions: [{channelId: "/@gone"}], job: {pending: ["/@gone"]}}, ids), null);
+  assert.equal(AI.draft({version: 2, suggestions: []}, ids), null);
+  assert.equal(AI.draft(null, ids), null);
+});

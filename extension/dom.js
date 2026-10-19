@@ -95,5 +95,25 @@
     return {active, recognized, visible, unknown: cards.length - recognized};
   }
 
-  root.YCGDom = {identity, collect, collectAsync, current, filter, filterAsync, invalidate, CARD_SELECTOR};
+  // Scroll the subscription list until YouTube stops adding channels. "complete" means that the list
+  // stopped growing and YouTube shows no continuation loader; the caller restores nothing else.
+  async function loadAll(document, view, {shouldContinue, onProgress = () => {}, wait = 1200, patience = 3, maxRounds = 600}) {
+    const count = () => document.querySelectorAll(CHANNEL_SELECTOR).length;
+    const more = () => !!document.querySelector("ytd-continuation-item-renderer");
+    const start = view.scrollY;
+    let last = count(), still = 0, rounds = 0, stopped = false;
+    while (rounds < maxRounds) {
+      rounds++;
+      view.scrollTo(0, document.documentElement.scrollHeight);
+      await new Promise(resolve => view.setTimeout(resolve, wait));
+      if (!shouldContinue()) { stopped = true; break; }
+      const now = count(); onProgress(now);
+      if (now > last) { last = now; still = 0; continue; }
+      if (++still >= (more() ? patience * 2 : patience)) break;
+    }
+    view.scrollTo(0, start);
+    return {count: count(), complete: !stopped && !more() && rounds < maxRounds, stopped};
+  }
+
+  root.YCGDom = {identity, collect, collectAsync, current, filter, filterAsync, invalidate, loadAll, CARD_SELECTOR};
 })(globalThis);

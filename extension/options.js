@@ -135,7 +135,7 @@ $("clear").addEventListener("click", async () => {
 (async () => {
   try {
     privacy = (await send("privacyGet")).privacy;
-    I.change((await send("preferencesGet")).preferences.language);
+    I.change(I.preferred((await send("preferencesGet")).preferences.language));
     const {config} = await send("settingsGet");
     if (config) { provider.value = config.provider; endpoint.value = config.endpoint; model.value = config.model; I.set(secret, "placeholder", config.secretConfigured ? "已保存；留空保留" : "未配置"); phase(4, "设置已保存"); }
     labels();
@@ -146,7 +146,7 @@ function resetOptions() {
   provider.value = "codex"; endpoint.value = model.value = secret.value = ""; secret.type = "password";
   $("show-secret").setAttribute("aria-pressed", "false"); I.set($("show-secret"), "textContent", "显示密钥");
   for (const field of [model, endpoint, secret]) { field.removeAttribute("aria-invalid"); field.setAttribute("aria-describedby", field.id + "-hint"); }
-  I.set(secret, "placeholder", "未配置"); hasYouTubeTheme = false; I.change("zh-CN"); labels(); phase(0, "尚未保存");
+  I.set(secret, "placeholder", "未配置"); hasYouTubeTheme = false; I.change(I.preferred()); labels(); phase(0, "尚未保存");
 }
 $("show-secret").addEventListener("click", () => {
   const show = secret.type === "password"; secret.type = show ? "text" : "password";

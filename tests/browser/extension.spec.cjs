@@ -68,7 +68,7 @@ test.beforeAll(async () => {
   let executablePath;
   for (const candidate of candidates) { try { await fs.access(candidate); executablePath = candidate; break; } catch {} }
   context = await chromium.launchPersistentContext(path.join(profile, "browser-profile"), {
-    channel: "chromium", executablePath, headless: true, viewport: {width: 1400, height: 1050},
+    channel: "chromium", executablePath, headless: true, viewport: {width: 1400, height: 1050}, locale: "zh-CN",
     env: {...process.env, YCG_NATIVE_CONFIG: config},
     args: [`--disable-extensions-except=${testExtension}`, `--load-extension=${testExtension}`]
   });
@@ -1295,6 +1295,7 @@ test("quality: confirmed deletion cancels AI, clears all data, rejects stale wri
   test.setTimeout(60000);
   await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state,'ycg.ai.undo.v1':{entries:[{channelId:'/@alphaai',before:[],after:['manual']}]},'ycg.preferences.v1':{language:'zh-CN'},'ycg.launcher-position.v1':{right:320,bottom:90}}),aiSeed);
   const options=await configureAI('api',mockOrigin+'/v1'); const page=await openAssistant();
+  await worker.evaluate(()=>chrome.storage.session.set({'ycg.ai.draft.999':{epoch:null,draft:{version:1,suggestions:[]}}}));
   aiRequests.length=0; mockHoldAt=1;
   await page.getByRole('button',{name:'生成分类建议',exact:true}).click(); await expect.poll(()=>aiRequests.length).toBe(1);
   await options.getByRole('button',{name:'删除全部扩展数据…',exact:true}).click();
@@ -1307,7 +1308,7 @@ test("quality: confirmed deletion cancels AI, clears all data, rejects stale wri
   await options.getByRole('button',{name:'确认删除全部数据',exact:true}).click(); await expect(options.getByRole('dialog')).toBeHidden();
   await expect(options.locator('#privacy-status')).toContainText('本机数据已删除');
   releaseMock?.(); mockHoldAt=0;
-  const stored=await worker.evaluate(()=>chrome.storage.local.get(null)); expect(Object.keys(stored)).toEqual(['ycg.privacy.v1']); expect(stored['ycg.privacy.v1'].collectionPaused).toBe(true);
+  const stored=await worker.evaluate(()=>chrome.storage.local.get(null)); expect(Object.keys(stored)).toEqual(['ycg.privacy.v1']); expect(await worker.evaluate(()=>chrome.storage.session.get(null))).toEqual({}); expect(stored['ycg.privacy.v1'].collectionPaused).toBe(true);
   const staleIcon=await testClient.evaluate(()=>chrome.runtime.sendMessage({scope:'ycg',type:'launcherPositionSave',epoch:null,position:{right:80,bottom:80}}));expect(staleIcon.ok).toBe(false);
   expect((await message({type:'collect',channels:aiSeed.channels})).ok).toBe(false);
   await page.goto('https://www.youtube.com/feed/channels'); await page.getByRole('button',{name:'频道分类',exact:true}).click();
@@ -1572,5 +1573,87 @@ test('launcher drag: cancel, pointer capture loss and touch movement keep the pa
   await touch('touchStart',after.x+24,after.y+24);await touch('touchMove',after.x+44,after.y+44);await touch('touchCancel');await expect.poll(()=>icon.boundingBox()).toEqual(after);
   await page.screenshot({path:path.join(artifacts,'quality-v0100/draggable-icon-touch.png')});
   await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:false});await page.setViewportSize({width:1400,height:1050});await icon.press('Enter');await expect.poll(()=>panel.boundingBox()).toEqual(windowBox);
+  await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
+});
+
+test('shortcut toggle and browser-language default: toggle restores drafts, manifest declares the command',async()=>{
+  // No saved preference: the zh-CN test locale decides the language.
+  await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state}),aiSeed);
+  expect(await worker.evaluate(async()=>(await chrome.storage.local.get('ycg.preferences.v1'))['ycg.preferences.v1'])).toBeUndefined();
+  const manifest=await worker.evaluate(()=>chrome.runtime.getManifest().commands);
+  expect(manifest['toggle-panel'].suggested_key.default).toBe('Alt+Shift+Y');
+  const page=await context.newPage();await page.goto('https://www.youtube.com/watch?v=example');
+  const panel=page.locator('.panel');
+  await expect(page.getByRole('button',{name:'频道分类',exact:true})).toBeEnabled();
+  // Playwright cannot press a browser command; send the message that the command handler sends.
+  // Without the tabs permission URLs are hidden, so message every tab; only YouTube content scripts answer.
+  const toggle=()=>worker.evaluate(async()=>{for(const tab of await chrome.tabs.query({}))await chrome.tabs.sendMessage(tab.id,{scope:'ycg',type:'toggle'},{frameId:0}).catch(()=>{});});
+  await toggle();await expect(panel).toBeVisible();
+  await page.getByRole('searchbox',{name:'搜索频道',exact:true}).fill('Alpha');
+  await toggle();await expect(panel).toBeHidden();
+  await expect(page.getByRole('button',{name:'恢复频道分类窗口',exact:true})).toBeVisible();
+  await toggle();await expect(panel).toBeVisible();
+  await expect(page.getByRole('searchbox',{name:'搜索频道',exact:true})).toHaveValue('Alpha');
+  await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
+});
+
+test('AI draft: unapplied edits survive a reload of the same tab and are removed after apply or tab close',async()=>{
+  mockMode='valid';
+  await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state,'ycg.preferences.v1':{language:'zh-CN'}}),aiSeed);
+  const drafts=()=>worker.evaluate(async()=>Object.keys(await chrome.storage.session.get(null)).filter(key=>key.startsWith('ycg.ai.draft.')));
+  const options=await configureAI('api',mockOrigin+'/v1');
+  let page=await openAssistant();
+  await page.getByLabel('AI 分类范围',{exact:true}).selectOption('all');
+  await page.getByRole('button',{name:'生成分类建议',exact:true}).click();
+  const suggested=()=>page.getByLabel('Alpha AI 的建议分类',{exact:true});
+  await expect(suggested()).toBeVisible();await suggested().fill('刷新后保留, 编程');
+  await expect.poll(async()=>(await worker.evaluate(async()=>Object.values(await chrome.storage.session.get(null))[0]?.draft?.suggestions?.[0]?.groups))).toEqual(['刷新后保留','编程']);
+  // Page scripts must not see the draft.
+  expect(await page.evaluate(()=>JSON.stringify({...sessionStorage,...localStorage}).includes('刷新后保留'))).toBe(false);
+  await page.reload();
+  await page.getByRole('button',{name:'频道分类',exact:true}).click();await page.getByText('✦ AI 分类助手',{exact:true}).click();
+  await expect(page.getByText(/^已恢复刷新前未应用的 AI 预览：2 条建议，待处理 0 个频道。/)).toBeVisible();
+  await page.getByRole('button',{name:'打开审核工作台',exact:true}).click();
+  await expect(suggested()).toHaveValue('刷新后保留, 编程');
+  await page.getByRole('button',{name:'应用勾选建议',exact:true}).click();
+  await expect(page.getByText('已应用 1 个频道的建议，原有分类已保留。',{exact:true})).toBeVisible();
+  const state=await getState(),group=state.groups.find(item=>item.name==='刷新后保留');
+  expect(group).toBeTruthy();expect(state.channels[0].groupIds).toContain(group.id);
+  await expect.poll(drafts).toEqual([]);
+  await page.close();
+  page=await openAssistant();
+  await page.getByLabel('AI 分类范围',{exact:true}).selectOption('all');
+  await page.getByRole('button',{name:'从头检查',exact:true}).click();
+  await page.getByRole('button',{name:'生成分类建议',exact:true}).click();
+  await expect(suggested()).toBeVisible();
+  await expect.poll(async()=>(await drafts()).length).toBe(1);
+  await page.close();
+  await expect.poll(drafts).toEqual([]);
+  await options.close();await worker.evaluate(()=>chrome.storage.local.clear());
+});
+
+test('auto-load: scrolls until the subscription list ends, reports coverage, and can be stopped',async()=>{
+  await worker.evaluate(()=>chrome.storage.local.set({'ycg.preferences.v1':{language:'zh-CN'}}));
+  // YouTube appends channels when the list bottom scrolls into view and drops the loader at the end.
+  const infinite=({pages,stall})=>{const main=document.querySelector('main');const spacer=document.createElement('div');spacer.style.height='2400px';main.append(spacer);
+    const loader=document.createElement('ytd-continuation-item-renderer');loader.textContent='正在加载…';main.append(loader);let page=0;
+    addEventListener('scroll',()=>{if(stall||page>=pages||innerHeight+scrollY<document.documentElement.scrollHeight-5)return;page++;
+      for(let i=0;i<5;i++)loader.insertAdjacentHTML('beforebegin',`<ytd-channel-renderer><a id="main-link" href="/@more${page}x${i}"><span id="channel-title">更多频道 ${page}-${i}</span></a></ytd-channel-renderer>`);
+      if(page===pages)loader.remove();});};
+  const page=await context.newPage();await page.goto('https://www.youtube.com/feed/channels');
+  await page.evaluate(infinite,{pages:3,stall:false});
+  await page.getByRole('button',{name:'频道分类',exact:true}).click();
+  await page.getByRole('button',{name:'自动加载全部订阅',exact:true}).click();
+  await expect(page.getByRole('button',{name:'停止自动加载',exact:true})).toBeVisible();
+  await expect(page.locator('.coverage')).toHaveText('已到列表底部：已收集全部 18 个订阅频道。',{timeout:20000});
+  expect((await getState()).channels).toHaveLength(18);
+  expect(await page.evaluate(()=>scrollY)).toBe(0);
+  await page.goto('https://www.youtube.com/feed/subscriptions');await page.getByRole('button',{name:'频道分类',exact:true}).click();
+  await expect(page.getByRole('button',{name:'自动加载全部订阅',exact:true})).toBeHidden();
+  await page.goto('https://www.youtube.com/feed/channels');await page.evaluate(infinite,{pages:3,stall:true});
+  await page.getByRole('button',{name:'频道分类',exact:true}).click();
+  await page.getByRole('button',{name:'自动加载全部订阅',exact:true}).click();
+  await page.getByRole('button',{name:'停止自动加载',exact:true}).click();
+  await expect(page.locator('.coverage')).toHaveText('已停止自动加载：已加载 3 个频道，列表可能未完。',{timeout:10000});
   await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
 });

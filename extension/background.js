@@ -12,8 +12,11 @@ importScripts(...workerScripts.map(value => bootstrap ? bootstrap.createScriptUR
 // Restrict secrets to extension pages and the service worker.
 const ready = chrome.storage.local.setAccessLevel({accessLevel: "TRUSTED_CONTEXTS"});
 const ports = new Set();
-const PREFERENCES = "ycg.preferences.v1", UNDO = "ycg.ai.undo.v1";
-const preferences = value => ({language: ["zh-CN", "en"].includes(value?.language) ? value.language : "zh-CN"});
+const PREFERENCES = "ycg.preferences.v1", UNDO = "ycg.ai.undo.v1", DRAFT = "ycg.ai.draft.";
+// Drafts live in session storage per tab: they survive a reload but not closing the tab or browser.
+chrome.tabs.onRemoved.addListener(tabId => { chrome.storage.session.remove(DRAFT + tabId).catch(() => {}); });
+// A null language means no saved choice; pages resolve it from the browser language.
+const preferences = value => ({language: ["zh-CN", "en"].includes(value?.language) ? value.language : null});
 const syncTabTheme = tabId => chrome.tabs.sendMessage(tabId, {scope: "ycg", type: "syncTheme"}).catch(() => {});
 chrome.tabs.onActivated.addListener(({tabId}) => { syncTabTheme(tabId); });
 chrome.windows.onFocusChanged.addListener(async windowId => {
@@ -174,8 +177,22 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
     await guard(message);
     requestController.abort(); requestController = new AbortController(); generating = false;
     transientTheme = null;
+    await chrome.storage.session.clear();
     const result = await YCGPrivacy.erase(chrome.storage.local, chrome.permissions, chrome.runtime.getManifest(), crypto.randomUUID());
     return {ok: true, ...result};
+  });
+  else if (message.type === "draftGet" || message.type === "draftSave") task = serial(async () => {
+    if (!sender.url?.startsWith("https://www.youtube.com/") || sender.frameId !== 0 || !Number.isInteger(sender.tab?.id)) throw new Error("只允许 YouTube 主页面保存 AI 预览");
+    const privacy = await guard(message), key = DRAFT + sender.tab.id;
+    const channelIds = (await readState()).channels.map(channel => channel.id);
+    if (message.type === "draftSave") {
+      const draft = message.draft && YCGAI.draft(message.draft, channelIds);
+      if (draft && new TextEncoder().encode(JSON.stringify(draft)).length > 4 * 1024 * 1024) throw new Error("AI 预览过大，刷新后无法恢复");
+      if (draft) await chrome.storage.session.set({[key]: {epoch: privacy.epoch, draft}}); else await chrome.storage.session.remove(key);
+      return {ok: true};
+    }
+    const stored = (await chrome.storage.session.get(key))[key];
+    return {ok: true, draft: stored?.epoch === privacy.epoch ? YCGAI.draft(stored.draft, channelIds) : null};
   });
   else if (message.type === "browse") task = serial(async () => ({ok: true, view: YCGCore.browse(await readState(), message.query)}));
   else if (message.type === "nativeStatus") task = trustedSettingsPage(sender) ? nativeRequest({action: "status"}, 10000) : Promise.reject(new Error("请在 AI 设置页检测安装"));
@@ -288,3 +305,11 @@ async function openFromAction(tab) {
   } catch { await chrome.tabs.create({url: "https://www.youtube.com/feed/channels"}); }
 }
 chrome.action.onClicked.addListener(openFromAction);
+// The shortcut acts only on a YouTube tab that already has the panel; it never opens a new tab.
+chrome.commands.onCommand.addListener(async (command, tab) => {
+  if (command !== "toggle-panel") return;
+  try {
+    const target = tab?.id ? tab : (await chrome.tabs.query({active: true, lastFocusedWindow: true}))[0];
+    if (target?.id) await chrome.tabs.sendMessage(target.id, {scope: "ycg", type: "toggle"}, {frameId: 0});
+  } catch {}
+});

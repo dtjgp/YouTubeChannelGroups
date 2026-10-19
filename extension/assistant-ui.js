@@ -16,7 +16,7 @@ globalThis.createYCGAssistant = function ({node, button, call, getState, mutate,
   const elapsed = node("p", {class: "muted"});
   const undoStatus = node("p", {class: "muted", role: "status", "aria-live": "polite"});
   let running = false, suggestions = [], job = null, stopRequested = false, undoAvailable = false, organizerBusy = false;
-  let timer, batchStarted;
+  let timer, batchStarted, draftTimer, draftReady = false;
   const reviewed = new Set();
   const generate = button("生成分类建议", async () => {
     if (running) return;
@@ -139,6 +139,7 @@ globalThis.createYCGAssistant = function ({node, button, call, getState, mutate,
     return getState().channels.filter(channel => !reviewed.has(channel.id) && (scope.value === "all" || !channel.groupIds.length));
   }
   function update() {
+    scheduleDraft();
     if (!element.open && !running && !organizerBusy) return;
     const total = candidates().length;
     const count = mode.value === "batch" ? Math.min(total, YCGAI.BATCH) : total;
@@ -162,6 +163,29 @@ globalThis.createYCGAssistant = function ({node, button, call, getState, mutate,
     if (job) { meter.hidden = false; meter.max = job.total; meter.value = job.completed; }
     review.update();
     organizer.update();
+  }
+  // Save the unapplied preview so a reload of this tab can restore it. Nothing is saved before the restore attempt ends.
+  function scheduleDraft() {
+    if (!draftReady) return;
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      const draft = suggestions.length || job?.pending.length ? {version: 1, suggestions, reviewed: [...reviewed], scope: scope.value, applyMode: applyMode.value,
+        job: job && {pending: job.pending, total: job.total, completed: job.completed, instructions: job.instructions, language: job.language}} : null;
+      call({type: "draftSave", draft}).catch(() => {});
+    }, 300);
+  }
+  async function restoreDraft() {
+    try {
+      const {draft} = await call({type: "draftGet"});
+      if (draft && !running && !suggestions.length && !job) {
+        suggestions = draft.suggestions; reviewed.clear(); draft.reviewed.forEach(id => reviewed.add(id));
+        scope.value = draft.scope; applyMode.value = draft.applyMode;
+        job = {...draft.job, reviewOpened: true};
+        review.refresh();
+        I.set(progress, "textContent", `已恢复刷新前未应用的 AI 预览：${suggestions.length} 条建议，待处理 ${job.pending.length} 个频道。应用前请再次检查。`);
+      }
+    } catch {}
+    finally { draftReady = true; update(); }
   }
   function updateElapsed() {
     I.set(elapsed, "textContent", running === "generate" && batchStarted ? `本批已等待 ${Math.floor((Date.now() - batchStarted) / 1000)} 秒；已生成 ${job.completed} / ${job.total} 个频道的建议。` : "");
@@ -188,5 +212,5 @@ globalThis.createYCGAssistant = function ({node, button, call, getState, mutate,
         node("p", {class: "muted", text: `模型把握：${names[item.certainty]} · ${item.reason}`})
       ]);
   }
-  return {element, update, refreshInfo, dispose() { clearInterval(timer); organizer.dispose(); }, localize() { update(); organizer.localize(); refreshInfo(); }, setUndoAvailable(value) { undoAvailable = value; update(); }};
+  return {element, update, refreshInfo, restoreDraft, dispose() { clearInterval(timer); clearTimeout(draftTimer); draftReady = false; organizer.dispose(); }, localize() { update(); organizer.localize(); refreshInfo(); }, setUndoAvailable(value) { undoAvailable = value; update(); }};
 };

@@ -6,7 +6,7 @@
   let privacy = {epoch: null, collectionPaused: false}, renderTicket = 0, renderFrame = 0, groupsSignature = "", filterTicket = 0;
   let scanTimer, scanning = false, lastScan = "", busy = false;
   let resizeSession = null, sizeSaveTimer, sizeWrites = 0, sizeSaveId = 0;
-  let minimized = false;
+  let minimized = false, loadingAll = false;
   let initialized = false, openWhenReady = false;
   let launcherSession = null, suppressLauncherClick = false, launcherSaveTimer, launcherWrites = 0, launcherSaveId = 0;
   const host = document.createElement("div");
@@ -87,6 +87,28 @@
     run(async () => { await mutate({type: "createGroup", name: createInput.value}); createInput.value = ""; }, "分类已创建");
   }}, [createInput, node("button", {type: "submit", class: "primary", text: "创建"})]);
   const collectButton = button("收集已加载频道", () => run(async () => { if (privacy.collectionPaused) privacy = (await call({type: "privacyResume"})).privacy; await scan(true); }, "频道已收集；继续滚动可发现更多"));
+  const coverage = node("p", {class: "muted coverage", role: "status", hidden: ""});
+  const loadAllButton = button("自动加载全部订阅", () => loadAllChannels(), {title: "自动滚动订阅频道列表，直到不再加载新频道"});
+  async function loadAllChannels() {
+    if (loadingAll) { loadingAll = false; I.set(loadAllButton, "textContent", "正在停止…"); return; }
+    if (location.pathname.replace(/\/$/, "") !== "/feed/channels") { say("请先打开订阅频道列表", true); return; }
+    const epoch = privacy.epoch;
+    loadingAll = true; I.set(loadAllButton, "textContent", "停止自动加载"); coverage.hidden = false;
+    I.set(coverage, "textContent", "正在自动加载订阅频道…");
+    try {
+      if (privacy.collectionPaused) privacy = (await call({type: "privacyResume"})).privacy;
+      const result = await Dom.loadAll(document, window, {
+        shouldContinue: () => loadingAll && epoch === privacy.epoch && location.pathname.replace(/\/$/, "") === "/feed/channels",
+        onProgress: count => I.set(coverage, "textContent", `正在自动加载订阅频道：已加载 ${count} 个…`)
+      });
+      if (epoch !== privacy.epoch) throw new Error("数据已删除，旧操作已取消；请重新开始");
+      await scan(true);
+      const text = result.complete ? `已到列表底部：已收集全部 ${result.count} 个订阅频道。`
+        : result.stopped ? `已停止自动加载：已加载 ${result.count} 个频道，列表可能未完。` : `列表可能未完：已加载 ${result.count} 个频道。可稍后再次自动加载。`;
+      I.set(coverage, "textContent", text); say(text);
+    } catch (error) { I.set(coverage, "textContent", error.message); say(error.message, true); }
+    finally { loadingAll = false; I.set(loadAllButton, "textContent", "自动加载全部订阅"); }
+  }
   const currentButton = button("加入当前频道", () => run(async () => {
     const channel = Dom.current(document, location.pathname);
     if (!channel) throw new Error("请先打开一个 YouTube 频道主页");
@@ -123,7 +145,7 @@
       node("div", {class: "intro"}, [node("strong", {text: "从你的订阅频道开始"}), node("p", {text: "打开订阅列表，滚动加载频道。扩展会收集已加载的频道；然后在下方勾选分类。"}),
         node("nav", {class: "links", "aria-label": "YouTube 页面"}, [link("① 订阅频道列表 ↗", "https://www.youtube.com/feed/channels"), link("② 订阅视频 ↗", "https://www.youtube.com/feed/subscriptions")])
       ]),
-      node("div", {class: "tools"}, [collectButton, currentButton]),
+      node("div", {class: "tools"}, [collectButton, loadAllButton, currentButton]), coverage,
       assistantHome,
       node("p", {class: "section-label", text: "我的分类"}), node("div", {class: "category-tools"}, [chips, reset]), feedStatus,
       node("label", {class: "control-label", for: "ycg-channel-search", text: "搜索频道"}), searchInput, count, channelList, channelPagination,
@@ -394,6 +416,7 @@
   chrome.runtime.onMessage.addListener(message => {
     if (message?.scope !== "ycg") return;
     if (message.type === "open") openPanel();
+    else if (message.type === "toggle") { if (panel.hidden) openPanel(); else minimizePanel(); }
     else if (message.type === "syncTheme") theme.sync();
   });
 
@@ -411,6 +434,7 @@
     I.set(launcher, "title", minimized ? "恢复频道分类窗口" : result.active ? `${name} · ${result.visible} 个视频` : "频道分类");
     reset.hidden = !result.active;
     collectButton.disabled = location.pathname.replace(/\/$/, "") !== "/feed/channels";
+    loadAllButton.hidden = collectButton.disabled; if (collectButton.disabled && !loadingAll) coverage.hidden = true;
     currentButton.hidden = !Core.path(location.pathname);
   }
   function render() {
@@ -533,10 +557,11 @@
   try {
     privacy = (await call({type: "privacyGet"})).privacy;
     I.set(collectButton, "textContent", privacy.collectionPaused ? "恢复收集已加载频道" : "收集已加载频道");
-    I.change((await call({type: "preferencesGet"})).preferences.language);
+    I.change(I.preferred((await call({type: "preferencesGet"})).preferences.language));
     layout.setSize((await call({type: "panelSizeGet"})).size);
     layout.setLauncherPosition((await call({type: "launcherPositionGet"})).position);
     state = await send({type: "get"}); render(); say("分类仅保存在这个浏览器配置文件中");
+    assistant.restoreDraft();
   } catch (error) { say(error.message, true); openPanel(); }
   finally { initialized = true; launcher.disabled = false; if (openWhenReady) { openWhenReady = false; openPanel(); } }
   function connectUpdates() {
@@ -552,13 +577,13 @@
               cancelResize(); clearTimeout(sizeSaveTimer); sizeSaveTimer = null; sizeSaveId++; selected = "all"; search = ""; searchInput.value = ""; channelPage = 0; lastScan = ""; groupsSignature = "";
               cancelLauncherDrag(); clearTimeout(launcherSaveTimer); launcherSaveTimer = null; launcherSaveId++; layout.setLauncherPosition(null);
               state = Core.empty(); showReview(false); assistantGeneration++; assistant.dispose();
-              reviewSurface.replaceChildren(); assistant = makeAssistant(); assistantHome.replaceChildren(assistant.element);
-              minimized = false; updateLauncher(); layout.setSize(); I.change("zh-CN"); render(); applyFilter();
+              reviewSurface.replaceChildren(); assistant = makeAssistant(); assistantHome.replaceChildren(assistant.element); assistant.restoreDraft();
+              minimized = false; updateLauncher(); layout.setSize(); I.change(I.preferred()); render(); applyFilter();
               say("本机数据已删除，自动收集已暂停");
             }
             I.set(collectButton, "textContent", privacy.collectionPaused ? "恢复收集已加载频道" : "收集已加载频道");
           }
-          if (message.preferences && message.preferences.language !== I.language) I.change(message.preferences.language);
+          if (message.preferences && I.preferred(message.preferences.language) !== I.language) I.change(I.preferred(message.preferences.language));
           if (message.panelSize && !resizeSession && !sizeWrites && !sizeSaveTimer) layout.setSize(message.panelSize);
           if (Object.hasOwn(message, "launcherPosition") && !launcherSession && !launcherWrites && !launcherSaveTimer) layout.setLauncherPosition(message.launcherPosition);
           if (typeof message.undoAvailable === "boolean") assistant.setUndoAvailable(message.undoAvailable);

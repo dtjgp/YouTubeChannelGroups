@@ -196,7 +196,7 @@
   "请先确认删除全部扩展数据": "Confirm deletion of all extension data first",
   "数据管理仅可在扩展设置页操作": "Manage data on the extension settings page",
   "频道查询无效": "Invalid channel search",
-  "频道、分类、撤销记录及设置保留在此浏览器中，直到你删除。未应用的 AI 预览在页面关闭或刷新后消失。": "Channels, categories, undo records, and settings remain in this browser until deletion. Unapplied AI previews disappear when the page closes or reloads.",
+  "频道、分类、撤销记录及设置保留在此浏览器中，直到你删除。未应用的分类建议在同一标签页刷新后恢复，关闭标签页或浏览器后消失；精简分类方案刷新后消失。": "Channels, categories, undo records, and settings remain in this browser until deletion. Unapplied suggestions are restored after a reload of the same tab and disappear when the tab or browser closes. Category organization plans disappear on reload.",
   "删除将清除本机频道、分类、撤销记录、AI 配置和密钥、界面偏好，并撤销可选连接权限。自动收集会暂停，直到你主动恢复。": "Deletion clears channels, categories, undo records, AI settings, keys, and preferences. It revokes optional connections and pauses collection until you resume.",
   "已导出的文件、已发送到 AI 服务的记录和本机 CLI 账号不在此删除范围内。它们须在对应位置管理。": "Exported files, AI provider records, and local CLI accounts remain outside this deletion. Manage them in their respective locations.",
   "此操作不可撤销。先导出备份，再确认删除。不会取消 YouTube 订阅或退出 CLI 账号。": "Deletion cannot be undone. Export a backup before confirming. YouTube subscriptions and CLI accounts are unaffected."
@@ -205,6 +205,24 @@
   english["方向键移动或调整；Shift 加快；Enter 或空格恢复默认；Esc 关闭或取消拖动。"] = "Use arrows to move or resize. Shift moves faster. Enter or Space resets the window. Escape closes it or cancels dragging.";
   english["查看视频：{channel}"] = "View videos: {channel}";
   english["建议分类"] = "Suggested categories";
+  Object.assign(english, {
+    "只允许 YouTube 主页面保存 AI 预览": "Only the main YouTube page can save AI previews",
+    "AI 预览过大，刷新后无法恢复": "The AI preview is too large to restore after a reload",
+    "自动加载全部订阅": "Load all subscriptions", "停止自动加载": "Stop loading", "正在停止…": "Stopping…",
+    "自动滚动订阅频道列表，直到不再加载新频道": "Scroll the subscription list automatically until no new channels load",
+    "正在自动加载订阅频道…": "Loading subscribed channels…",
+    "正在自动加载订阅频道：已加载 {count} 个…": "Loading subscribed channels: {count} loaded…",
+    "已到列表底部：已收集全部 {count} 个订阅频道。": "Reached the end of the list: all {count} subscribed channels collected.",
+    "已停止自动加载：已加载 {count} 个频道，列表可能未完。": "Loading stopped: {count} channels loaded. The list may be incomplete.",
+    "列表可能未完：已加载 {count} 个频道。可稍后再次自动加载。": "The list may be incomplete: {count} channels loaded. Try loading again later.",
+    "已恢复刷新前未应用的 AI 预览：{count} 条建议，待处理 {remaining} 个频道。应用前请再次检查。": "Restored the unapplied AI preview from before the reload: {count} suggestions, {remaining} channels pending. Check it again before applying."
+  });
+  Object.assign(english, {
+    "本机小助手返回错误": "The local helper returned an error", "连接中断": "Connection lost", "操作失败": "Operation failed",
+    "请在 AI 设置页检测安装": "Check the installation on the AI settings page",
+    "只允许 YouTube 主页面请求 AI 分类": "Only the main YouTube page can request AI classification",
+    "只允许 YouTube 主页面同步主题": "Only the main YouTube page can sync the theme", "无效的 YouTube 主题": "Invalid YouTube theme"
+  });
   let language = "zh-CN";
   const bindings = new WeakMap(), listeners = new Set();
   const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -222,7 +240,7 @@
     for (const pattern of patterns) {
       const match = source.match(pattern.expression);
       if (!match) continue;
-      const values = Object.fromEntries(pattern.fields.map((field, i) => [field, ["error", "certainty", "unknown", "providers"].includes(field) ? t(match[i + 1]) : match[i + 1]]));
+      const values = Object.fromEntries(pattern.fields.map((field, i) => [field, ["error", "certainty", "unknown", "providers", "detail"].includes(field) ? t(match[i + 1]) : match[i + 1]]));
       return pattern.target.replace(/\{(\w+)\}/g, (_, field) => values[field]);
     }
     return source;
@@ -252,7 +270,12 @@
     if (!["zh-CN", "en"].includes(next)) throw new Error("请选择中文或 English");
     language = next; listeners.forEach(listener => listener(next));
   }
-  const api = {t, set, refresh, register, change, get language() { return language; }, onChange(listener) { listeners.add(listener); return () => listeners.delete(listener); }};
+  // A saved choice wins; otherwise follow the browser's preferred language.
+  function preferred(saved, browser = root.navigator?.language) {
+    if (["zh-CN", "en"].includes(saved)) return saved;
+    return /^zh\b/i.test(browser || "zh") ? "zh-CN" : "en";
+  }
+  const api = {t, set, refresh, register, change, preferred, get language() { return language; }, onChange(listener) { listeners.add(listener); return () => listeners.delete(listener); }};
   root.YCGI18n = api;
   if (typeof module !== "undefined") module.exports = api;
 })(globalThis);
