@@ -187,6 +187,15 @@ test("real extension: collect, categorize, filter, dynamic cards, navigation, ba
   await expect(page.getByRole("checkbox", {name: "Alpha AI：AI", exact: true})).toBeChecked();
   await page.getByRole("searchbox", {name: "搜索频道"}).fill("Beta");
   await expect(page.getByText("1 个频道", {exact: true})).toBeVisible();
+  await page.getByRole("button", {name: "AI 1", exact: true}).click();
+  await expect(page.locator('[data-test-channel="BetaMusic"]').first()).toBeHidden();
+  await page.reload();
+  await expect(page.locator('[data-test-channel="BetaMusic"]').first()).toBeHidden();
+  await expect(page.locator('[data-test-channel="AlphaAI"]').first()).toBeVisible();
+  await page.getByRole("button", {name: "频道分类", exact: true}).click();
+  await expect(page.getByRole("button", {name: "AI 1", exact: true})).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", {name: "显示全部", exact: true}).click();
+  await expect(page.locator('[data-test-channel="BetaMusic"]').first()).toBeVisible();
   expect(errors).toEqual([]);
   await page.close();
 });

@@ -518,7 +518,10 @@
     else if (message.type === "syncTheme") theme.sync();
   });
 
-  function choose(id) { selected = id; channelPage = 0; render(); applyFilter(); }
+  function choose(id) {
+    selected = id; channelPage = 0; render(); applyFilter();
+    call({type: "filterSave", filter: id}).catch(() => {});
+  }
   async function applyFilter() {
     const ticket = ++filterTicket;
     const result = await Dom.filterAsync(document, location.pathname, state, selected, () => ticket === filterTicket);
@@ -732,7 +735,10 @@
     I.change(I.preferred((await call({type: "preferencesGet"})).preferences.language));
     layout.setSize((await call({type: "panelSizeGet"})).size);
     layout.setLauncherPosition((await call({type: "launcherPositionGet"})).position);
-    state = await send({type: "get"}); render(); say("分类仅保存在这个浏览器配置文件中");
+    state = await send({type: "get"});
+    const saved = (await call({type: "filterGet"})).filter;
+    if (["unassigned", ...state.groups.map(group => group.id)].includes(saved)) { selected = saved; applyFilter(); }
+    render(); say("分类仅保存在这个浏览器配置文件中");
     assistant.restoreDraft();
     resumePending().catch(error => say(error.message, true));
   } catch (error) { say(error.message, true); openPanel(); }

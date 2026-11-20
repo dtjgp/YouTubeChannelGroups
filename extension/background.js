@@ -12,7 +12,7 @@ importScripts(...workerScripts.map(value => bootstrap ? bootstrap.createScriptUR
 // Restrict secrets to extension pages and the service worker.
 const ready = chrome.storage.local.setAccessLevel({accessLevel: "TRUSTED_CONTEXTS"});
 const ports = new Set();
-const PREFERENCES = "ycg.preferences.v1", UNDO = "ycg.ai.undo.v1", DRAFT = "ycg.ai.draft.", PENDING = "ycg.pending.";
+const PREFERENCES = "ycg.preferences.v1", FILTER = "ycg.filter.v1", UNDO = "ycg.ai.undo.v1", DRAFT = "ycg.ai.draft.", PENDING = "ycg.pending.";
 // Drafts live in session storage per tab: they survive a reload but not closing the tab or browser.
 chrome.tabs.onRemoved.addListener(tabId => { chrome.storage.session.remove([DRAFT + tabId, PENDING + tabId]).catch(() => {}); });
 // One-time repair after an install or update (reloading an unpacked extension also counts).
@@ -256,6 +256,15 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
       await chrome.storage.local.set({[YCGLayout.KEY]: YCGLayout.normalizeSize(size)});
     }
     return {ok: true, size: YCGLayout.normalizeSize((await chrome.storage.local.get(YCGLayout.KEY))[YCGLayout.KEY])};
+  });
+  else if (message.type === "filterGet" || message.type === "filterSave") task = serial(async () => {
+    if (message.type === "filterSave") {
+      await guard(message);
+      if (typeof message.filter !== "string" || !message.filter || message.filter.length > 100) throw new Error("筛选分类无效");
+      await chrome.storage.local.set({[FILTER]: message.filter});
+    }
+    const filter = (await chrome.storage.local.get(FILTER))[FILTER];
+    return {ok: true, filter: typeof filter === "string" && filter && filter.length <= 100 ? filter : "all"};
   });
   else if (message.type === "launcherPositionGet" || message.type === "launcherPositionSave") task = serial(async () => {
     if (message.type === "launcherPositionSave") {
