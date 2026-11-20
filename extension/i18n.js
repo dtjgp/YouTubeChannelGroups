@@ -162,7 +162,7 @@
     "请选择中文或 English": "Choose Chinese or English", "无效的导出格式": "Invalid export format",
     "频道格式无效": "Invalid channel format", "频道数据过长": "Channel data exceeds the limit", "频道地址无效": "Invalid channel URL", "频道地址重复": "Duplicate channel URL",
     "频道引用了不存在的分类": "Channel refers to a missing category", "频道列表无效": "Invalid channel list", "视频列表无效": "Invalid video list",
-    "筛选分类无效": "Invalid filter category", "已加入新订阅的频道“{title}”，可在面板中为它分类": "Added newly subscribed channel “{title}”. You can categorize it in the panel.", "显示 {visible} / {recognized} 个已加载视频 · 正在自动加载更多视频": "Showing {visible} of {recognized} loaded videos · loading more automatically", "分类 ID无效": "Invalid category ID", "频道名称无效": "Invalid channel name",
+    "筛选分类无效": "Invalid filter category", "按分类筛选订阅视频": "Filter subscription videos by category", "已加入新订阅的频道“{title}”，可在面板中为它分类": "Added newly subscribed channel “{title}”. You can categorize it in the panel.", "显示 {visible} / {recognized} 个已加载视频 · 正在自动加载更多视频": "Showing {visible} of {recognized} loaded videos · loading more automatically", "分类 ID无效": "Invalid category ID", "频道名称无效": "Invalid channel name",
     "不支持的操作": "Unsupported action", "请先授权 AI 服务地址": "Allow the AI host first", "AI 设置仅可在扩展设置页修改": "Edit AI settings on the extension settings page",
     "请使用撤销 AI 分类操作": "Use the undo AI application action", "每批选择 1–{count} 个频道": "Choose 1 to {count} channels per batch"
   };

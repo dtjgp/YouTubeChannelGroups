@@ -50,6 +50,19 @@
   const feedStatus = node("p", {class: "feed-status"});
   const feedLink = link("按分类筛选订阅视频 ↗", "https://www.youtube.com/feed/subscriptions", {class: "feed-link"});
   const chips = node("div", {class: "chips", role: "group", "aria-label": "按分类筛选"});
+  // A chip row inside the subscription feed itself, styled like YouTube's own filter chips.
+  const feedBar = document.createElement("div");
+  feedBar.id = "ycg-feed-bar";
+  const feedShadow = feedBar.attachShadow({mode: "open"});
+  const feedChips = node("div", {class: "bar", role: "group", "aria-label": "按分类筛选订阅视频"});
+  feedShadow.append(node("style", {text: `:host { display: block; margin: 0 0 16px; }
+.bar { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; padding: 4px 0; font-family: Roboto, Arial, sans-serif; }
+button { flex: none; border: 0; border-radius: 8px; padding: 0 12px; height: 32px; font: 500 14px/32px Roboto, Arial, sans-serif; white-space: nowrap; cursor: pointer;
+  color: var(--yt-spec-text-primary, #0f0f0f); background: var(--yt-spec-badge-chip-background, rgba(0,0,0,.05)); }
+button:hover { background: var(--yt-spec-button-chip-background-hover, rgba(0,0,0,.1)); }
+button[aria-pressed="true"] { color: var(--yt-spec-text-primary-inverse, #fff); background: var(--yt-spec-text-primary, #0f0f0f); }
+button:focus-visible { outline: 2px solid var(--yt-spec-call-to-action, #065fd4); outline-offset: 2px; }`, localize: false}), feedChips);
+  let feedSignature = "";
   const channelList = node("ul", {id: "ycg-channels", tabindex: "-1", class: "channel-list", "aria-label": "频道列表"});
   const count = node("p", {class: "count"});
   const groupList = node("div");
@@ -521,7 +534,8 @@
   });
 
   function choose(id) {
-    selected = id; channelPage = 0; topUpRounds = 0; render(); applyFilter();
+    selected = id; channelPage = 0; topUpRounds = 0; render();
+    if (!panel.hidden) applyFilter();
     call({type: "filterSave", filter: id}).catch(() => {});
   }
   async function applyFilter() {
@@ -544,6 +558,20 @@
     collectButton.hidden = !channelsPage || !privacy.collectionPaused;
     if (!channelsPage && !loadingAll) coverage.hidden = true;
     currentButton.hidden = !Core.path(location.pathname);
+    placeFeedBar(subscriptions);
+  }
+  function placeFeedBar(subscriptions) {
+    if (!subscriptions || !state.groups.length) { feedBar.remove(); feedSignature = ""; return; }
+    const grid = document.querySelector('ytd-browse[page-subtype="subscriptions"] ytd-rich-grid-renderer, ytd-browse[page-subtype="subscriptions"] ytd-section-list-renderer');
+    const first = document.querySelector("ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, yt-lockup-view-model");
+    const anchor = grid || first;
+    if (!anchor) return;
+    if (feedBar.nextElementSibling !== anchor) anchor.before(feedBar);
+    const signature = JSON.stringify([I.language, selected, state.groups]);
+    if (signature === feedSignature) return;
+    feedSignature = signature;
+    feedChips.replaceChildren(...[{id: "all", name: I.t("全部")}, {id: "unassigned", name: I.t("未分类")}, ...state.groups]
+      .map(group => button(group.name, () => choose(group.id), {localize: false, "aria-pressed": String(selected === group.id)})));
   }
   // Hidden cards collapse the feed, so YouTube may never see the scroll that loads the next page.
   // Nudge it a bounded number of times while the active filter shows too few videos.
@@ -556,7 +584,8 @@
   }
   function render() {
     renderTicket++;
-    if (panel.hidden || renderFrame) return;
+    if (panel.hidden) { if (initialized) applyFilter(); return; }
+    if (renderFrame) return;
     renderFrame = requestAnimationFrame(() => { renderFrame = 0; renderView(renderTicket).catch(error => say(error.message, true)); });
   }
   async function renderView(ticket) {

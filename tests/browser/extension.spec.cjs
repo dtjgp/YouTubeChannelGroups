@@ -1873,6 +1873,33 @@ test('sparse filtered feed: loads more pages automatically, a bounded number of 
   await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
 });
 
+test('subscription feed chip bar: filters in the page without opening the panel and follows category changes',async()=>{
+  await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state,'ycg.preferences.v1':{language:'zh-CN'}}),{version:1,groups:[{id:'g',name:'AI'},{id:'m',name:'音乐'}],channels:[{id:'/@alphaai',title:'Alpha AI',aliases:['/@alphaai'],groupIds:['g']},{id:'/@betamusic',title:'Beta Music',aliases:['/@betamusic'],groupIds:['m']}]});
+  const page=await context.newPage();await page.goto('https://www.youtube.com/feed/subscriptions');
+  const bar=page.locator('#ycg-feed-bar').getByRole('group',{name:'按分类筛选订阅视频'});
+  await expect(bar.getByRole('button')).toHaveText(['全部','未分类','AI','音乐']);
+  await expect(page.locator('.panel')).toBeHidden();
+  await bar.getByRole('button',{name:'音乐',exact:true}).click();
+  await expect(bar.getByRole('button',{name:'音乐',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('[data-test-channel="BetaMusic"]')).toBeVisible();
+  await expect(page.locator('[data-test-channel="AlphaAI"]')).toBeHidden();
+  await expect(page.locator('[data-test-channel="unknown"]')).toBeVisible();
+  // Placed before the feed, it stays when the filter hides the first video.
+  expect(await page.evaluate(()=>document.querySelector('#ycg-feed-bar').compareDocumentPosition(document.querySelector('[data-test-channel="AlphaAI"]'))&Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
+  await page.getByRole('button',{name:'频道分类',exact:true}).click();
+  await expect(page.locator('.chip[aria-pressed="true"]')).toHaveText('音乐 1');
+  await page.locator('.chip',{hasText:'未分类'}).click();
+  await expect(bar.getByRole('button',{name:'未分类',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('[data-test-channel="GammaCode"]')).toBeVisible();
+  await expect(page.locator('[data-test-channel="BetaMusic"]')).toBeHidden();
+  await bar.getByRole('button',{name:'全部',exact:true}).click();
+  await expect(page.locator('[data-test-channel="AlphaAI"]')).toBeVisible();
+  await page.goto('https://www.youtube.com/feed/channels');
+  await expect(page.getByRole('button',{name:'频道分类',exact:true})).toBeEnabled();
+  await expect(page.locator('#ycg-feed-bar')).toHaveCount(0);
+  await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
+});
+
 test('subscribe in YouTube: the channel page header and a video owner row add the channel automatically',async()=>{
   await worker.evaluate(()=>chrome.storage.local.set({'ycg.preferences.v1':{language:'zh-CN'},'ycg.privacy.v1':{epoch:'e',collectionPaused:false}}));
   const page=await context.newPage();
