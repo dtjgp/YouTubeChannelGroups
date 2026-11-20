@@ -61,5 +61,9 @@ test("organization atomically replaces the entire taxonomy, covers all channels 
   ]) assert.throws(() => Core.reduce(state, invalid, () => `new${++sequence}`));
   const edited = Core.reduce(state, {type: "renameGroup", id: "old", name: "手工修改"});
   assert.throws(() => Core.reduce(edited, action), /已变更/);
+  const watched = Core.reduce(state, {type: "recordVideos", videos: [{aliases: [state.channels[0].id], title: "新视频"}]});
+  assert.equal(Core.reduce(watched, action, () => `w${++sequence}`).channels[0].recentVideos[0], "新视频");
+  assert.equal(Core.classification(watched), Core.classification(Core.validate(state)));
+  assert.deepEqual(Core.keepVideos(Core.validate(state), watched).channels[0].recentVideos, ["新视频"]);
   assert.equal(JSON.stringify(state), snapshot);
 });

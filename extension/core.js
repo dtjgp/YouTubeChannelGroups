@@ -89,6 +89,16 @@
     return state;
   }
 
+  // Recent video titles are background AI context, not user classification; ignore them in conflict checks.
+  function classification(state) {
+    return JSON.stringify({...state, channels: state.channels.map(({recentVideos, ...channel}) => channel)});
+  }
+  function keepVideos(target, source) {
+    const videos = new Map(source.channels.filter(channel => channel.recentVideos?.length).map(channel => [channel.id, channel.recentVideos]));
+    target.channels.forEach(channel => { if (videos.has(channel.id)) channel.recentVideos = videos.get(channel.id); });
+    return target;
+  }
+
   function upsert(state, candidates) {
     if (!Array.isArray(candidates) || candidates.length > 10000) fail("频道列表无效");
     const owners = new Map(), rank = new Map(), removed = new Set();
@@ -179,7 +189,7 @@
         break;
       }
       case "applyOrganization": {
-        if (JSON.stringify(state) !== JSON.stringify(validate(action.base))) fail("频道或分类已变更，请重新生成精简方案");
+        if (classification(state) !== classification(validate(action.base))) fail("频道或分类已变更，请重新生成精简方案");
         if (!Array.isArray(action.names) || !action.names.length || action.names.length > 20) fail("精简方案需要 1–20 个分类");
         const oldGroups = state.groups;
         state.groups = action.names.map(value => {
@@ -276,7 +286,7 @@
     const [a = 0, b = 0, c = 0] = details.previousVersion.split(".").map(Number);
     return a === 0 && (b < 12 || (b === 12 && c < 1));
   }
-  const api = {channelMap, KEY, MAX_BYTES, empty, path, avatar, validate, reduce, matches, browse, repairDoubledNames, needsNameRepair};
+  const api = {channelMap, KEY, MAX_BYTES, empty, path, avatar, validate, reduce, matches, browse, repairDoubledNames, needsNameRepair, classification, keepVideos};
   root.YCGCore = api;
   if (typeof module !== "undefined") module.exports = api;
 })(globalThis);

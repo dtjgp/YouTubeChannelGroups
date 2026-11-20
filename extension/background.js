@@ -53,7 +53,7 @@ async function readState() {
   return YCGCore.validate(stored[YCGCore.KEY] ?? YCGCore.empty());
 }
 async function stateHash(state) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(state)));
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(YCGCore.classification(state)));
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
 }
 chrome.runtime.onConnect.addListener(port => {
@@ -340,7 +340,7 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
       const undo = (await chrome.storage.local.get(UNDO))[UNDO];
       if (undo?.kind === "organization") {
         if (await stateHash(state) !== undo.afterHash) throw new Error("分类已发生后续修改，无法安全撤销；请手动调整或恢复备份");
-        next = YCGCore.validate(undo.before);
+        next = YCGCore.keepVideos(YCGCore.validate(undo.before), state);
       } else next = YCGCore.reduce(state, {type: "restoreSuggestions", entries: undo?.entries});
       updates = {[UNDO]: null};
     } else {

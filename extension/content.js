@@ -62,7 +62,7 @@ button { flex: none; border: 0; border-radius: 8px; padding: 0 12px; height: 32p
 button:hover { background: var(--yt-spec-button-chip-background-hover, rgba(0,0,0,.1)); }
 button[aria-pressed="true"] { color: var(--yt-spec-text-primary-inverse, #fff); background: var(--yt-spec-text-primary, #0f0f0f); }
 button:focus-visible { outline: 2px solid var(--yt-spec-call-to-action, #065fd4); outline-offset: 2px; }`, localize: false}), feedChips);
-  let feedSignature = "";
+  let feedSignature = "", feedBarTimer = 0;
   const channelList = node("ul", {id: "ycg-channels", tabindex: "-1", class: "channel-list", "aria-label": "频道列表"});
   const count = node("p", {class: "count"});
   const groupList = node("div");
@@ -558,7 +558,8 @@ button:focus-visible { outline: 2px solid var(--yt-spec-call-to-action, #065fd4)
     collectButton.hidden = !channelsPage || !privacy.collectionPaused;
     if (!channelsPage && !loadingAll) coverage.hidden = true;
     currentButton.hidden = !Core.path(location.pathname);
-    placeFeedBar(subscriptions);
+    // Building the chip row touches YouTube's layout, so it runs in its own task instead of the caller's.
+    if (!feedBarTimer) feedBarTimer = setTimeout(() => { feedBarTimer = 0; placeFeedBar(location.pathname.replace(/\/$/, "") === "/feed/subscriptions"); });
   }
   function placeFeedBar(subscriptions) {
     if (!subscriptions || !state.groups.length) { feedBar.remove(); feedSignature = ""; return; }

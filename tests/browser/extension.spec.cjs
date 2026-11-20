@@ -279,10 +279,10 @@ test("AI cloud: trusted settings, real local HTTP, editable preview, secret isol
   await page.getByRole("button", {name: "频道分类", exact: true}).click();
   await page.getByText("✦ AI 分类助手", {exact: true}).click();
   await aiOption(page, "AI 分类范围", "all");
-  const before = await getState();
+  const before = classified(await getState());
   await page.getByRole("button", {name: "生成分类建议", exact: true}).click();
   await expect(page.getByLabel("Alpha AI 的建议分类", {exact: true})).toBeVisible();
-  expect(await getState()).toEqual(before);
+  expect(classified(await getState())).toEqual(before);
   await expect(page.getByRole("checkbox", {name: "应用 Beta Music 的 AI 建议", exact: true})).not.toBeChecked();
   await page.getByLabel("Alpha AI 的建议分类", {exact: true}).fill("AI研究, 编程");
   await page.screenshot({path: path.join(artifacts, "preview-ai.png")});
@@ -297,7 +297,7 @@ test("AI cloud: trusted settings, real local HTTP, editable preview, secret isol
   expect(request.body.messages[1].content).not.toContain("groupIds");
   await page.getByRole("button", {name: "应用勾选建议", exact: true}).click();
   await expect(page.getByText("已应用 1 个频道的建议，原有分类已保留。", {exact: true})).toBeVisible();
-  const after = await getState();
+  const after = classified(await getState());
   expect(after.channels[0].groupIds).toHaveLength(3);
   expect(after.channels[0].groupIds).toContain("manual");
   expect(after.channels[1].groupIds).toEqual([]);
@@ -306,7 +306,7 @@ test("AI cloud: trusted settings, real local HTTP, editable preview, secret isol
   mockMode = "malformed";
   await page.getByRole("button", {name: "生成分类建议", exact: true}).click();
   await expect(page.locator(".ai-progress")).toContainText("AI 未返回有效 JSON，请重试或更换模型");
-  expect(await getState()).toEqual(after);
+  expect(classified(await getState())).toEqual(after);
   mockMode = "valid";
   // Changing destinations must not forward the previous API key.
   await options.locator("#endpoint").fill(mockOrigin + "/other-v1");
@@ -385,7 +385,7 @@ test("all 134 channels: seven automatic requests, one preview and atomic apply",
   expect(sentChannels().map(batch => batch.length)).toEqual([20, 20, 20, 20, 20, 20, 14]);
   expect(sentChannels().flat()).toEqual(seed.channels.map(channel => channel.id));
   await expect(page.locator(".ai-suggestion")).toHaveCount(8);
-  expect(await getState()).toEqual(seed);
+  expect(classified(await getState())).toEqual(classified(seed));
   await page.screenshot({path: path.join(artifacts, "preview-ai-all.png")});
   await page.getByRole("button", {name: "应用勾选建议", exact: true}).click();
   await expect(page.locator(".ai-progress")).toContainText("已应用 134 个频道的建议");
@@ -404,7 +404,7 @@ test("failed batch resumes remaining channels and preserves successful previews"
   await expect(page.locator(".ai-progress")).toContainText("HTTP 500");
   await expect(page.locator(".ai-progress")).toContainText("已完成 20 / 45");
   await expect(page.locator(".ai-suggestion")).toHaveCount(8);
-  expect(await getState()).toEqual(seed);
+  expect(classified(await getState())).toEqual(classified(seed));
   await page.getByLabel("批量频道 0 的建议分类", {exact: true}).fill("人工修正");
   await page.getByRole("button", {name: "继续剩余 25 个频道", exact: true}).click();
   await expect(page.locator(".ai-progress")).toContainText("已完成 45 个频道的建议");
@@ -433,7 +433,7 @@ test("stop after the current batch, apply partial results, resume and select sin
     releaseMock(); releaseMock = null; mockHoldAt = 0;
     await expect(page.locator(".ai-progress")).toContainText("已暂停，已完成 20 / 45");
     expect(sentChannels().map(batch => batch.length)).toEqual([20]);
-    expect(await getState()).toEqual(seed);
+    expect(classified(await getState())).toEqual(classified(seed));
     await page.getByRole("button", {name: "应用勾选建议", exact: true}).click();
     await expect(page.locator(".ai-progress")).toContainText("已应用 20 个频道的建议");
     await page.getByRole("button", {name: "继续剩余 25 个频道", exact: true}).click();
@@ -466,7 +466,7 @@ test("all categorized channels can be reclassified; unselected channels and late
   await page.getByRole("button", {name: "生成分类建议", exact: true}).click();
   await expect(page.locator(".ai-progress")).toContainText("已完成 2 个频道");
   expect(sentChannels().flat()).toEqual(aiSeed.channels.map(channel => channel.id));
-  expect(await getState()).toEqual(aiSeed);
+  expect(classified(await getState())).toEqual(classified(aiSeed));
   await expect(page.getByRole("progressbar", {name: "AI 分类进度", exact: true})).toHaveAttribute("value", "2");
   await page.getByRole("button", {name: "应用勾选建议", exact: true}).click();
   await expect(page.locator(".ai-progress")).toContainText("已重新分类 1 个频道");
@@ -475,7 +475,7 @@ test("all categorized channels can be reclassified; unselected channels and late
   expect(current.channels[1].groupIds).toEqual([]);
   await page.getByRole("button", {name: "撤销上次 AI 分类", exact: true}).click();
   await expect(page.locator(".ai-progress")).toContainText("上次 AI 分类已撤销");
-  expect((await getState()).channels).toEqual(aiSeed.channels);
+  expect(classified(await getState()).channels).toEqual(aiSeed.channels);
   await page.getByRole("button", {name: "从头检查", exact: true}).click();
   await page.getByRole("button", {name: "生成分类建议", exact: true}).click();
   await expect(page.locator(".ai-progress")).toContainText("已完成 2 个频道");
@@ -485,7 +485,7 @@ test("all categorized channels can be reclassified; unselected channels and late
   current = await getState();
   await page.getByRole("button", {name: "撤销上次 AI 分类", exact: true}).click();
   await expect(page.locator(".ai-progress")).toContainText("后续修改");
-  expect(await getState()).toEqual(current);
+  expect(classified(await getState())).toEqual(classified(current));
   await page.close(); await options.close();
 });
 
@@ -652,6 +652,8 @@ test("glass window overlays the wide page without changing layout and preserves 
   await worker.evaluate(() => chrome.storage.local.remove('ycg.panel-size.v1'));
   const page = await context.newPage(); await pinMedia(page); await page.goto('https://www.youtube.com/feed/subscriptions');
   await expect(page.getByRole('button',{name:'频道分类',exact:true})).toBeVisible();
+  // The in-feed category chips are part of YouTube's page once the saved categories have loaded.
+  await expect(page.locator('#ycg-feed-bar')).toHaveCount((await getState()).groups.length ? 1 : 0);
   await page.locator('#ycg-root').evaluate(host=>{host.style.display='none';});
   const original=await youtubeGeometry(page);
   await page.locator('#ycg-root').evaluate(host=>host.style.removeProperty('display'));
@@ -839,7 +841,7 @@ test("category browsing opens channel videos and filters loaded subscription cho
   await expect(page.locator('[data-test-channel="BetaMusic"]')).toBeVisible();
   await expect(page.locator('[data-test-channel="AlphaAI"]')).toBeHidden();
   await page.screenshot({path: path.join(artifacts, "preview-category-browse.png")});
-  expect(await getState()).toEqual(seed);
+  expect(classified(await getState())).toEqual(classified(seed));
   const options = await context.newPage();
   await options.goto(new URL("options.html", worker.url()).href);
   await options.getByLabel("界面语言", {exact: true}).selectOption("en");
@@ -850,6 +852,7 @@ test("category browsing opens channel videos and filters loaded subscription cho
   await page.close(); await options.close();
 });
 
+const classified = state => ({...state, channels: state.channels.map(({recentVideos, ...channel}) => channel)});
 async function openOrganization(text = "合并成3大类，每个频道最多3类") {
   const page = await openAssistant();
   await page.getByRole("combobox", {name: "AI 任务", exact: true}).selectOption("organize");
@@ -869,7 +872,7 @@ test("organization: natural count, edited plan, fixed batches, whole replacement
   await expect(page.locator(".plan-category")).toHaveCount(3);
   await expect(page.getByText(/方案共 3 类，参考 45 个频道样本/)).toBeVisible();
   await expect(page.getByRole("progressbar", {name: "精简分类进度", exact: true})).toHaveAttribute("value", "1");
-  expect(await getState()).toEqual(seed);
+  expect(classified(await getState())).toEqual(classified(seed));
   await page.getByRole("textbox", {name: "方案分类 1", exact: true}).fill("科技与AI");
   await options.getByLabel("界面语言", {exact: true}).selectOption("en");
   await expect(page.getByRole("button", {name: "Classify all channels with this plan", exact: true})).toBeVisible();
@@ -890,7 +893,7 @@ test("organization: natural count, edited plan, fixed batches, whole replacement
   expect(requests.map(data => data.channels.length)).toEqual([20, 20, 5]);
   expect(requests.every(data => JSON.stringify(data.groups) === JSON.stringify(["科技与AI", "总体分类2", "总体分类3"]))).toBe(true);
   expect(requests.flatMap(data => data.channels.map(channel => channel.id))).toEqual(seed.channels.map(channel => channel.id));
-  expect(await getState()).toEqual(seed);
+  expect(classified(await getState())).toEqual(classified(seed));
   await expect(page.getByText(/预览 45 个频道，其中 1 个未分类/)).toBeVisible();
   const first = page.locator(".organizer .ai-suggestion").first();
   await first.locator("summary").click();
@@ -917,7 +920,7 @@ test("organization: natural count, edited plan, fixed batches, whole replacement
   await page.getByRole("combobox", {name: "AI 任务", exact: true}).selectOption("organize");
   await page.getByRole("button", {name: "撤销上次 AI 分类", exact: true}).click();
   await expect(page.locator(".ai-assistant > p[role=status]")).toContainText("后续修改");
-  expect(await getState()).toEqual(edited);
+  expect(classified(await getState())).toEqual(classified(edited));
   await page.close(); await options.close(); mockMode = "valid";
 });
 
@@ -930,7 +933,7 @@ test("organization: count errors, rogue categories, pause, failed batch resume a
   mockMode = "plan-wrong"; aiRequests.length = 0;
   await page.getByRole("button", {name: "生成精简方案", exact: true}).click();
   await expect(progress).toContainText("不符合要求的分类数量");
-  expect(await getState()).toEqual(seed);
+  expect(classified(await getState())).toEqual(classified(seed));
   mockMode = "valid";
   await page.getByRole("button", {name: "生成精简方案", exact: true}).click();
   await expect(page.locator(".plan-category")).toHaveCount(3);
@@ -939,7 +942,7 @@ test("organization: count errors, rogue categories, pause, failed batch resume a
   // Out-of-plan names are dropped instead of failing the batch, so the plan stays fixed.
   await expect(progress).toContainText("归类预览已完成");
   await expect(page.getByText("方案外新分类")).toHaveCount(0);
-  expect(await getState()).toEqual(seed);
+  expect(classified(await getState())).toEqual(classified(seed));
   mockMode = "valid";
   await page.getByRole("button", {name: "返回分类与设置", exact: true}).click();
   await page.getByRole("button", {name: "重新规划", exact: true}).click();
@@ -964,13 +967,13 @@ test("organization: count errors, rogue categories, pause, failed batch resume a
     await page.getByRole("button", {name: "继续归类剩余 25 个频道", exact: true}).click();
     await expect(progress).toContainText("归类预览已完成");
     expect(aiRequests.map(request => JSON.parse(request.body.messages[1].content).channels.length)).toEqual([20, 20, 20, 5]);
-    expect(await getState()).toEqual(seed);
+    expect(classified(await getState())).toEqual(classified(seed));
     await message({type: "renameGroup", id: "old0", name: "手工改名"});
     await expect(progress).toContainText("已变更");
     await expect(page.getByRole("button", {name: "替换旧分类并应用", exact: true})).toBeDisabled();
     const edited = await getState();
     expect((await message({type: "applyOrganization", base: seed, names: ["总体分类1", "总体分类2", "总体分类3"], suggestions: seed.channels.map(channel => ({channelId: channel.id, groups: ["总体分类1"]}))})).ok).toBe(false);
-    expect(await getState()).toEqual(edited);
+    expect(classified(await getState())).toEqual(classified(edited));
   } finally {
     releaseMock?.(); releaseMock = null; mockHoldAt = mockFailureAt = 0; mockMode = "valid";
     await page.close(); await options.close();
@@ -991,11 +994,11 @@ test("organization stays compatible with installed-protocol Codex and Claude nat
     expect(calls).toHaveLength(2);
     expect(calls[0].data.channels).toHaveLength(20);
     expect(calls[1].data.groups).toEqual(["总体分类1", "总体分类2"]);
-    expect(await getState()).toEqual(aiSeed);
+    expect(classified(await getState())).toEqual(aiSeed);
     await page.getByRole("button", {name: "替换旧分类并应用", exact: true}).click();
     await expect.poll(async () => (await getState()).groups.length).toBe(2);
     await page.getByRole("button", {name: "撤销上次 AI 分类", exact: true}).click();
-    await expect.poll(getState).toEqual(aiSeed);
+    await expect.poll(async () => classified(await getState())).toEqual(aiSeed);
     await page.close(); await options.close();
   }
 });
@@ -1147,7 +1150,7 @@ test("review workspace pins targets and actions, pages results and saves real dr
   await cards.first().locator(".review-drag-label").dragTo(page.locator('.organizer .review-target[data-category="总体分类2"]'));
   await expect(cards).toHaveCount(0);
   await expect(page.locator(".organizer .review-notice")).toContainText("批量频道 0");
-  expect(await getState()).toEqual(seed);
+  expect(classified(await getState())).toEqual(classified(seed));
   await page.getByRole("combobox", {name: "审核筛选", exact: true}).selectOption("all");
   await expect(cards.first().locator("summary")).toHaveText("总体分类2");
   await page.getByRole("combobox", {name: "审核筛选", exact: true}).selectOption("g:总体分类2");
@@ -1179,7 +1182,7 @@ test("review workspace pins targets and actions, pages results and saves real dr
   expect(pager.y + pager.height).toBeLessThanOrEqual(smallPanel.y + smallPanel.height);
   await page.screenshot({path: path.join(artifacts, "preview-review-narrow.png")});
   await page.setViewportSize({width: 1800, height: 1100});
-  expect(await getState()).toEqual(seed);
+  expect(classified(await getState())).toEqual(classified(seed));
   await page.getByRole("button", {name: "替换旧分类并应用", exact: true}).click();
   await expect.poll(getState).not.toEqual(seed);
   const saved = await getState(), id = name => saved.groups.find(group => group.name === name).id;
