@@ -8,7 +8,7 @@ const literal = /"((?:[^"\\\n]|\\.)*)"|'((?:[^'\\\n]|\\.)*)'|`((?:[^`\\]|\\.)*)`
 const chinese = /[㐀-鿿]/;
 // Model-facing prompts, regular expressions and strings assembled from parts that are translated separately.
 const exempt = [
-  /^你是频道分类助手/, /^\\n\\n以下 JSON/, /^\(\?:/, /^十$/, /^\(\$\{number\}\)/, /^这是总体分类规划任务/, /^分类槽位 /,
+  /^你是频道分类助手/, /^\\n\\n以下 JSON/, /^以下 JSON 是待分类数据/, /^\(\?:/, /^十$/, /^\(\$\{number\}\)/, /^这是总体分类规划任务/, /^分类槽位 /,
   /^固定分类任务/, /^请使用中文/, /^\$\{label\}无效$/, /^(分类 ID|分类名称|频道名称)$/, /^\$\{I\.t\(/,
   /^AI 请求失败（HTTP $/, /^），请检查登录/,
   // The language button names the target language in that language, so it is never translated.

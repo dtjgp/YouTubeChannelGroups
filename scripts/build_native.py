@@ -24,7 +24,7 @@ subprocess.run([*common, "native/Installer.swift", "-o", str(contents / "MacOS/I
 (contents / "Info.plist").write_bytes(plistlib.dumps({
     "CFBundleExecutable": "Installer", "CFBundleIdentifier": "com.dtjgp.youtube-channel-groups.installer",
     "CFBundleName": "YouTube 分类小助手安装器", "CFBundlePackageType": "APPL",
-    "CFBundleShortVersionString": "0.3.0", "CFBundleVersion": "3", "LSMinimumSystemVersion": "13.0",
+    "CFBundleShortVersionString": "0.4.0", "CFBundleVersion": "4", "LSMinimumSystemVersion": "13.0",
     "NSHighResolutionCapable": True,
 }))
 subprocess.run(["codesign", "--force", "--sign", "-", str(host)], check=True, capture_output=True)

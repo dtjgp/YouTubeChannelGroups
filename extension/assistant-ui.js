@@ -34,8 +34,9 @@ globalThis.createYCGAssistant = function ({node, button, call, getState, mutate,
         batchStarted = Date.now();
         I.set(progress, "textContent", `正在处理第 ${Math.floor(job.completed / YCGAI.BATCH) + 1} / ${Math.ceil(job.total / YCGAI.BATCH)} 批，已完成 ${job.completed} / ${job.total} 个频道。本机每批最多等待约两分钟…`);
         const language = job.language === "en" ? "Use English for category names and explanations. " : "请使用中文分类名称和说明。";
-        const response = await call({type: "aiSuggest", channelIds, instructions: language + job.instructions});
+        const response = await call({type: "aiSuggest", channelIds, language: job.language, instructions: language + job.instructions});
         suggestions.push(...response.suggestions.map(item => ({...item, selected: item.groups.length > 0 && item.certainty !== "low"})));
+        suggestions.push(...(response.missing || []).map(channelId => ({channelId, groups: [], reason: I.t("AI 未返回有效结果，请手动分类或稍后重试"), certainty: "low", selected: false})));
         job.pending.splice(0, channelIds.length); job.completed += channelIds.length;
         renderPreview();
         if (!job.reviewOpened) { job.reviewOpened = true; showReview(true); }
@@ -207,9 +208,18 @@ globalThis.createYCGAssistant = function ({node, button, call, getState, mutate,
         item.groups = [...new Set(event.target.value.split(/[,，]/).map(name => name.trim()).filter(Boolean))];
         item.reviewed = true; update();
       }});
+      const existing = getState().groups.map(group => group.name);
+      const similar = item.groups.filter(name => !existing.includes(name)).map(name => [name, YCGAI.similarName(name, existing)]).filter(([, other]) => other);
       return node("li", {class: "ai-suggestion"}, [
         node("label", {class: "row"}, [checkbox, createYCGAvatar(node, channel), node("strong", {text: channel?.title || item.channelId, localize: false})]), node("label", {class: "control-label", text: "建议分类"}, [input]),
-        node("p", {class: "muted", text: `模型把握：${names[item.certainty]} · ${item.reason}`})
+        node("p", {class: "muted", text: `模型把握：${names[item.certainty]} · ${item.reason}`}),
+        ...similar.map(([name, other]) => node("div", {class: "row similar-name"}, [
+          node("span", {class: "muted", text: `新分类“${name}”与已有分类“${other}”相近`}),
+          button(`改用“${other}”`, () => {
+            if (running) return;
+            item.groups = [...new Set(item.groups.map(value => value === name ? other : value))]; item.reviewed = true; renderPreview();
+          })
+        ]))
       ]);
   }
   return {element, update, refreshInfo, restoreDraft, dispose() { clearInterval(timer); clearTimeout(draftTimer); draftReady = false; organizer.dispose(); }, localize() { update(); organizer.localize(); refreshInfo(); }, setUndoAvailable(value) { undoAvailable = value; update(); }};

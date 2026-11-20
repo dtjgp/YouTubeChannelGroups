@@ -31,9 +31,13 @@ test("bounded planning uses representative samples and rejects count violations 
 
 test("fixed taxonomy blocks category growth across batches and preserves canonical names", () => {
   const value = {suggestions: [{channelId: "/@channel0", groups: ["ai"], reason: "主题", certainty: "high"}]};
-  assert.deepEqual(AI.parseFixed(value, ["/@channel0"], ["AI", "音乐"])[0].groups, ["AI"]);
+  assert.deepEqual(AI.parseFixed(value, ["/@channel0"], ["AI", "音乐"]).suggestions[0].groups, ["AI"]);
   value.suggestions[0].groups = ["新分类"];
-  assert.throws(() => AI.parseFixed(value, ["/@channel0"], ["AI", "音乐"]), /方案以外/);
+  const dropped = AI.parseFixed(value, ["/@channel0"], ["AI", "音乐"]);
+  assert.deepEqual(dropped.suggestions[0].groups, []); assert.equal(dropped.suggestions[0].certainty, "low"); assert.deepEqual(dropped.missing, []);
+  value.suggestions[0].groups = ["新分类", "音乐"];
+  assert.deepEqual(AI.parseFixed(value, ["/@channel0"], ["AI", "音乐"]).suggestions[0].groups, ["音乐"]);
+  assert.deepEqual(AI.parseFixed({suggestions: []}, ["/@channel0"], ["AI"]).missing, ["/@channel0"]);
   assert.throws(() => AI.taxonomyNames(["AI", "ai"]), /重复/);
 });
 

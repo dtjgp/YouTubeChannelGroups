@@ -115,3 +115,27 @@ test("restored AI drafts keep only known channels and well-formed fields", () =>
   assert.equal(AI.draft({version: 2, suggestions: []}, ids), null);
   assert.equal(AI.draft(null, ids), null);
 });
+
+test("requests carry language, group samples and an English prompt when asked", () => {
+  const data = AI.requestData(state, ["/@two"], "", "en");
+  assert.equal(data.language, "en");
+  assert.deepEqual(data.groupSamples, [{name: "手动分类", channels: ["One"]}]);
+  assert.match(AI.prompt(data), /^You /);
+  assert.match(AI.system("zh-CN"), /^你是频道分类助手/);
+  assert.equal(AI.system("fr"), AI.system("zh-CN"));
+});
+
+test("partial parsing keeps valid suggestions and reports missing channels", () => {
+  const value = {suggestions: [suggestion("/@two", ["教程"]), {channelId: "/@one", groups: "bad"}, suggestion("/@unknown")]};
+  const result = AI.parsePartial(value, ["/@one", "/@two"]);
+  assert.deepEqual(result.suggestions.map(item => item.channelId), ["/@two"]);
+  assert.deepEqual(result.missing, ["/@one"]);
+  assert.throws(() => AI.parsePartial("not json", ["/@one"]));
+});
+
+test("near-duplicate category names map to the existing name", () => {
+  assert.equal(AI.similarName("编程类", ["编程", "音乐"]), "编程");
+  assert.equal(AI.similarName("Game", ["Games"]), "Games");
+  assert.equal(AI.similarName("AI 工具", ["AI工具"]), "AI工具");
+  assert.equal(AI.similarName("烹饪", ["编程", "音乐"]), null);
+});

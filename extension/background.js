@@ -143,30 +143,51 @@ async function suggest(message) {
     const config = await savedConfig();
     if (!config) throw new Error("请先打开“AI 设置”选择 Codex、Claude 或云端 API");
     const state = await serial(readState), planning = message.type === "aiPlan";
-    let data;
-    if (planning) data = YCGAI.planData(state, message.instructions, message.language);
-    else {
-      data = YCGAI.requestData(state, message.channelIds, message.instructions);
+    const build = channelIds => {
+      const value = YCGAI.requestData(state, channelIds, message.instructions, message.language);
       if (message.taxonomy) {
         if (typeof message.instructions !== "string" || message.instructions.length > 750) throw new Error("请用 1–700 字描述分类数量和侧重点");
-        data.groups = YCGAI.taxonomyNames(message.taxonomy);
-        data.instructions = "固定分类任务：严格只使用 groups 中的分类名，不得新增或改名。每频道最多3类；信息不足时返回空 groups。用户要求：" + message.instructions;
+        value.groups = YCGAI.taxonomyNames(message.taxonomy);
+        delete value.groupSamples;
+        value.instructions = (value.language === "en" ? "Fixed taxonomy task: use only the names in groups exactly; never add or rename categories. At most 3 per channel; return empty groups when information is insufficient. User request: " : "固定分类任务：严格只使用 groups 中的分类名，不得新增或改名。每频道最多3类；信息不足时返回空 groups。用户要求：") + message.instructions;
+      }
+      return value;
+    };
+    const ask = async data => {
+      await guard(message);
+      if (controller.signal.aborted) throw new Error("数据已删除，旧操作已取消；请重新开始");
+      let answer;
+      if (config.provider === "api") {
+        if (!await chrome.permissions.contains({origins: [YCGAI.originPattern(config.endpoint)]})) throw new Error("尚未授权 AI 服务地址，请在 AI 设置中保存并授权");
+        const url = config.endpoint.endsWith("/chat/completions") ? config.endpoint : config.endpoint + "/chat/completions";
+        const result = await jsonFetch(url, {method: "POST", headers: {"Content-Type": "application/json", ...(config.secret ? {Authorization: "Bearer " + config.secret} : {})}, body: JSON.stringify({model: config.model, stream: false, max_tokens: 4096, messages: [{role: "system", content: YCGAI.system(data.language)}, {role: "user", content: JSON.stringify(data)}]})}, 25000, controller.signal);
+        answer = result.choices?.[0]?.message?.content;
+      } else {
+        answer = (await nativeRequest({action: "classify", provider: config.provider, model: config.model, data}, 135000, controller.signal)).result;
+      }
+      await guard(message);
+      return answer;
+    };
+    if (planning) {
+      const answer = await ask(YCGAI.planData(state, message.instructions, message.language));
+      return {ok: true, plan: YCGAI.parsePlan(answer, message.instructions), base: state, sampleCount: Math.min(100, state.channels.length)};
+    }
+    const read = (answer, ids) => message.taxonomy ? YCGAI.parseFixed(answer, ids, message.taxonomy) : YCGAI.parsePartial(answer, ids);
+    const first = read(await ask(build(message.channelIds)), message.channelIds);
+    const suggestions = first.suggestions;
+    let missing = first.missing;
+    // Retry once with only the channels the model skipped or answered badly.
+    if (missing.length) {
+      try {
+        const second = read(await ask(build(missing)), missing);
+        suggestions.push(...second.suggestions); missing = second.missing;
+      } catch (error) {
+        if (controller.signal.aborted) throw error;
+        await guard(message);
       }
     }
-    let answer;
-    await guard(message);
-    if (controller.signal.aborted) throw new Error("数据已删除，旧操作已取消；请重新开始");
-    if (config.provider === "api") {
-      if (!await chrome.permissions.contains({origins: [YCGAI.originPattern(config.endpoint)]})) throw new Error("尚未授权 AI 服务地址，请在 AI 设置中保存并授权");
-      const url = config.endpoint.endsWith("/chat/completions") ? config.endpoint : config.endpoint + "/chat/completions";
-      const result = await jsonFetch(url, {method: "POST", headers: {"Content-Type": "application/json", ...(config.secret ? {Authorization: "Bearer " + config.secret} : {})}, body: JSON.stringify({model: config.model, stream: false, max_tokens: 4096, messages: [{role: "system", content: YCGAI.SYSTEM}, {role: "user", content: JSON.stringify(data)}]})}, 25000, controller.signal);
-      answer = result.choices?.[0]?.message?.content;
-    } else {
-      answer = (await nativeRequest({action: "classify", provider: config.provider, model: config.model, data}, 135000, controller.signal)).result;
-    }
-    await guard(message);
-    if (planning) return {ok: true, plan: YCGAI.parsePlan(answer, message.instructions), base: state, sampleCount: Math.min(100, state.channels.length)};
-    return {ok: true, suggestions: message.taxonomy ? YCGAI.parseFixed(answer, data.channels.map(channel => channel.id), message.taxonomy) : YCGAI.parse(answer, data.channels.map(channel => channel.id))};
+    if (!suggestions.length) throw new Error("AI 未返回有效的频道建议，请重试或更换模型");
+    return {ok: true, suggestions, missing};
   } finally { if (requestController === controller) generating = false; }
 }
 chrome.runtime.onMessage.addListener((message, sender, reply) => {

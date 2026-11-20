@@ -311,7 +311,7 @@ test("native Codex and Claude: browser starts compiled host and fixed CLI adapte
     expect(saved.endpoint).toBe(""); expect(saved.secret).toBe("");
     await expect(options.locator("#api-fields")).toBeHidden();
     await options.getByRole("button", {name: "检测小助手", exact: true}).click();
-    await expect(options.locator("#native-status")).toContainText("小助手 0.3.0 已连接");
+    await expect(options.locator("#native-status")).toContainText("小助手 0.4.0 已连接");
     await options.screenshot({path: path.join(artifacts, "preview-native-settings.png"), fullPage: true});
     const page = await context.newPage();
     await page.goto("https://www.youtube.com/feed/subscriptions");

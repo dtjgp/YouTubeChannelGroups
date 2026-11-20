@@ -43,7 +43,7 @@ after(async () => { await fs.rm(temporary, {recursive: true, force: true}); });
 test("native framing handles multiple messages and status never invokes a model", async () => {
   const connection = client(); connection.send({action: "status"}); connection.send({action: "status"});
   for (let n = 0; n < 2; n++) {
-    const result = await connection.next(); assert.equal(result.ok, true); assert.equal(result.version, "0.3.0"); assert.deepEqual(result.providers, ["codex", "claude"]);
+    const result = await connection.next(); assert.equal(result.ok, true); assert.equal(result.version, "0.4.0"); assert.deepEqual(result.providers, ["codex", "claude"]);
   }
   connection.child.stdin.end(); await once(connection.child, "close");
   await assert.rejects(fs.access(log));
@@ -62,8 +62,17 @@ test("only bounded classification operations reach fixed CLI adapters", async ()
   for (const provider of ["codex", "claude"]) {
     connection.send(payload(provider)); const response = await connection.next(); assert.equal(response.ok, true, response.error); assert.equal(response.result.suggestions[0].groups[0], "音乐");
   }
+  const english = payload("claude");
+  Object.assign(english.data, {language: "en", extra: "dropped", groupSamples: [{name: "Music", channels: ["A", "B", "C", "D"]}]});
+  english.data.channels[0].recentVideos = ["v1", "v2", "v3", "v4", "v5", "v6"];
+  connection.send(english); assert.equal((await connection.next()).ok, true);
   connection.child.stdin.end(); await once(connection.child, "close");
   const calls = (await fs.readFile(log, "utf8")).trim().split("\n").map(JSON.parse);
+  assert.match(calls[0].input, /^你是频道分类助手/);
+  const sent = calls[2].input, data = JSON.parse(sent.slice(sent.indexOf("{")));
+  assert.match(sent, /^You are a channel categorization assistant/);
+  assert.equal(data.language, "en"); assert.equal(data.extra, undefined);
+  assert.deepEqual(data.groupSamples, [{name: "Music", channels: ["A", "B", "C"]}]); assert.equal(data.channels[0].recentVideos.length, 5);
   assert.ok(calls[0].args.includes("--ignore-user-config")); assert.ok(calls[0].args.includes("shell_tool"));
   assert.ok(calls[1].args.includes("--restricted")); assert.equal(calls[1].args[calls[1].args.indexOf("--tools") + 1], "");
 });

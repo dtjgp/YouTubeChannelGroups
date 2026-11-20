@@ -59,8 +59,8 @@ globalThis.createYCGOrganizer = function ({node, button, call, getState, mutate,
         started = Date.now();
         I.set(progress, "textContent", `按固定 ${job.taxonomy.length} 类归类：已完成 ${done} / ${job.total} 个频道。`);
         const outputLanguage = language === "en" ? "Use English explanations. " : "请使用中文说明。";
-        const response = await call({type: "aiSuggest", taxonomy: job.taxonomy, channelIds, instructions: outputLanguage + jobInstructions});
-        assignments.push(...response.suggestions);
+        const response = await call({type: "aiSuggest", taxonomy: job.taxonomy, channelIds, language, instructions: outputLanguage + jobInstructions});
+        assignments.push(...response.suggestions, ...(response.missing || []).map(channelId => ({channelId, groups: [], reason: I.t("AI 未返回有效结果，请手动分类或稍后重试"), certainty: "low"})));
         job.pending.splice(0, channelIds.length); renderAssignments();
         if (!job.reviewOpened) { job.reviewOpened = true; showReview(true); }
       }
