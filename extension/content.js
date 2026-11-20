@@ -4,7 +4,7 @@
   const Core = globalThis.YCGCore, Dom = globalThis.YCGDom, I = globalThis.YCGI18n;
   let state = Core.empty(), selected = "all", search = "", channelPage = 0;
   let privacy = {epoch: null, collectionPaused: false}, renderTicket = 0, renderFrame = 0, groupsSignature = "", filterTicket = 0;
-  let scanTimer, scanning = false, lastScan = "", busy = false;
+  let scanTimer, scanning = false, recording = false, lastScan = "", busy = false;
   let resizeSession = null, sizeSaveTimer, sizeWrites = 0, sizeSaveId = 0;
   let minimized = false, loadingAll = false;
   let initialized = false, openWhenReady = false;
@@ -670,7 +670,20 @@
     if (current()) groupList.replaceChildren(...forms);
   }
 
+  async function recordVideos() {
+    if (recording || privacy.collectionPaused || !state.channels.length) return;
+    const epoch = privacy.epoch;
+    const loaded = await Dom.videosAsync(document, location.pathname, () => epoch === privacy.epoch && !privacy.collectionPaused);
+    if (!loaded || epoch !== privacy.epoch) return;
+    const owners = new Map(state.channels.flatMap(channel => channel.aliases.map(alias => [alias, channel])));
+    const videos = loaded.filter(item => { const channel = item.aliases.map(alias => owners.get(alias)).find(Boolean); return channel && !(channel.recentVideos || []).includes(item.title); });
+    if (!videos.length) return;
+    recording = true;
+    try { await mutate({type: "recordVideos", videos: videos.slice(0, 1000)}); }
+    finally { recording = false; }
+  }
   async function scan(explicit = false) {
+    if (!explicit && location.pathname.replace(/\/$/, "") === "/feed/subscriptions") return recordVideos();
     if (location.pathname.replace(/\/$/, "") !== "/feed/channels") {
       if (explicit) throw new Error("请先打开订阅频道列表");
       return;

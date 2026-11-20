@@ -127,3 +127,15 @@ test("the saved-name repair runs on install or when updating from a version befo
   assert.equal(Core.needsNameRepair({reason: "chrome_update", previousVersion: "0.10.0"}), false);
   assert.equal(Core.needsNameRepair(undefined), false);
 });
+
+test("recent video titles are bounded, newest first and only kept for known channels", () => {
+  let state = {version: 1, groups: [], channels: [{id: "/@one", title: "One", aliases: ["/@one", "/channel/UCOne"], groupIds: [], recentVideos: ["old a", "old b", "old c", "old d"]}]};
+  state = Core.reduce(state, {type: "recordVideos", videos: [
+    {aliases: ["/channel/UCOne"], title: "  new   one "}, {aliases: ["/@one"], title: "old b"}, {aliases: ["/@unknown"], title: "ignored"}, {aliases: ["/@one"], title: "x".repeat(150)}
+  ]});
+  assert.equal(state.channels.length, 1);
+  assert.deepEqual(state.channels[0].recentVideos, ["new one", "old b", "x".repeat(100), "old a", "old c"]);
+  const restored = Core.validate({...state, channels: [{...state.channels[0], recentVideos: [1, "a", "a", "b", "c", "d", "e", "f"]}]});
+  assert.deepEqual(restored.channels[0].recentVideos, ["a", "b", "c", "d", "e"]);
+  assert.throws(() => Core.reduce(state, {type: "recordVideos", videos: "bad"}));
+});

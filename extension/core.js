@@ -64,9 +64,29 @@
       if (memberships.some(id => !groupIds.has(id))) fail("频道引用了不存在的分类");
       const description = typeof channel.description === "string" ? channel.description.trim().slice(0, 600) : "";
       const avatarUrl = avatar(channel.avatarUrl);
-      return {id, title, aliases, groupIds: memberships, ...(description ? {description} : {}), ...(avatarUrl ? {avatarUrl} : {})};
+      const recentVideos = videoTitles(channel.recentVideos);
+      return {id, title, aliases, groupIds: memberships, ...(description ? {description} : {}), ...(avatarUrl ? {avatarUrl} : {}), ...(recentVideos.length ? {recentVideos} : {})};
     });
     return {version: 1, groups, channels};
+  }
+
+  function videoTitles(value) {
+    if (!Array.isArray(value)) return [];
+    return [...new Set(value.filter(title => typeof title === "string").map(title => title.trim().replace(/\s+/g, " ").slice(0, 100)).filter(Boolean))].slice(0, 5);
+  }
+  // Newest titles first; keeps up to five per already collected channel and never creates channels.
+  function recordVideos(state, items) {
+    if (!Array.isArray(items) || items.length > 1000) fail("视频列表无效");
+    const owners = new Map(state.channels.flatMap(channel => channel.aliases.map(alias => [alias, channel]))), fresh = new Map();
+    for (const item of items) {
+      const channel = (Array.isArray(item?.aliases) ? item.aliases : []).map(path).filter(Boolean).map(alias => owners.get(alias)).find(Boolean);
+      const title = videoTitles([item?.title])[0];
+      if (!channel || !title) continue;
+      if (!fresh.has(channel)) fresh.set(channel, []);
+      fresh.get(channel).push(title);
+    }
+    for (const [channel, titles] of fresh) channel.recentVideos = videoTitles([...titles, ...(channel.recentVideos || [])]);
+    return state;
   }
 
   function upsert(state, candidates) {
@@ -103,6 +123,7 @@
     const state = validate(value);
     switch (action?.type) {
       case "collect": upsert(state, action.channels); break;
+      case "recordVideos": recordVideos(state, action.videos); break;
       case "createGroup": {
         const name = string(action.name, 40, "分类名称");
         state.groups.push({id: makeId(), name});

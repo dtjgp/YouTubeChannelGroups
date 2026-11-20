@@ -74,6 +74,20 @@
     return complete ? {active, recognized, visible, unknown: cards.length - recognized} : null;
   }
 
+  const VIDEO_TITLE_SELECTOR = "#video-title, .yt-lockup-metadata-view-model__title, h3";
+  // Video titles from the loaded subscription feed, in page order (newest first).
+  async function videosAsync(document, pathname, current) {
+    if (pathname.replace(/\/$/, "") !== "/feed/subscriptions") return [];
+    const cards = [...document.querySelectorAll(CARD_SELECTOR)].filter(card => !card.parentElement?.closest(CARD_SELECTOR) && !card.closest("ytd-guide-renderer, ytd-mini-guide-renderer"));
+    const items = [];
+    const completed = await root.YCGWork.each(cards, card => {
+      const item = cachedIdentity(card), node = card.querySelector(VIDEO_TITLE_SELECTOR);
+      const title = (node?.getAttribute("title") || node?.textContent || "").trim().replace(/\s+/g, " ").slice(0, 100);
+      if (item && title) items.push({aliases: item.aliases, title});
+    }, current);
+    return completed ? items : null;
+  }
+
   function current(document, pathname) {
     const id = Core.path(pathname);
     if (!id) return null;
@@ -124,5 +138,5 @@
     return {count: count(), complete: !stopped && !more() && rounds < maxRounds, stopped};
   }
 
-  root.YCGDom = {identity, collect, collectAsync, current, filter, filterAsync, invalidate, loadAll, CARD_SELECTOR};
+  root.YCGDom = {identity, collect, collectAsync, videosAsync, current, filter, filterAsync, invalidate, loadAll, CARD_SELECTOR};
 })(globalThis);

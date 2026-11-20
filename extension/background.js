@@ -324,7 +324,7 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
     if (message.type !== "mutate") throw new Error("不支持的操作");
     const privacy = await guard(message);
     const action = message.action;
-    if (action?.type === "collect" && privacy.collectionPaused) throw new Error("自动收集已暂停；点击收集按钮后恢复");
+    if ((action?.type === "collect" || action?.type === "recordVideos") && privacy.collectionPaused) throw new Error("自动收集已暂停；点击收集按钮后恢复");
     if (action?.type === "restoreSuggestions") throw new Error("请使用撤销 AI 分类操作");
     let next, updates;
     if (action?.type === "undoSuggestions") {

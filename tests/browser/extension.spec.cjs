@@ -165,6 +165,7 @@ test("real extension: collect, categorize, filter, dynamic cards, navigation, ba
   await expect(page.locator('[data-test-channel="BetaMusic"]').first()).toBeHidden();
   await page.getByRole("button", {name: "显示全部", exact: true}).click();
   await expect(page.locator('[data-test-channel="BetaMusic"]').first()).toBeVisible();
+  await expect.poll(async () => (await getState()).channels.find(channel => channel.id === "/@betamusic")?.recentVideos).toEqual(expect.arrayContaining(["周末音乐精选", "新加载音乐视频"]));
 
   const downloadPromise = page.waitForEvent("download");
   await expand(page, ".footer-menu");
@@ -919,18 +920,25 @@ test("organization: count errors, rogue categories, pause, failed batch resume a
   await expect(page.locator(".plan-category")).toHaveCount(3);
   mockMode = "org-rogue"; aiRequests.length = 0;
   await page.getByRole("button", {name: "按方案自动归类全部频道", exact: true}).click();
-  await expect(progress).toContainText("方案以外");
+  // Out-of-plan names are dropped instead of failing the batch, so the plan stays fixed.
+  await expect(progress).toContainText("归类预览已完成");
+  await expect(page.getByText("方案外新分类")).toHaveCount(0);
   expect(await getState()).toEqual(seed);
-  mockMode = "valid"; mockHoldAt = 2;
+  mockMode = "valid";
+  await page.getByRole("button", {name: "返回分类与设置", exact: true}).click();
+  await page.getByRole("button", {name: "重新规划", exact: true}).click();
+  await page.getByRole("button", {name: "生成精简方案", exact: true}).click();
+  await expect(page.locator(".plan-category")).toHaveCount(3);
+  aiRequests.length = 0; mockHoldAt = 1;
   try {
-    await page.getByRole("button", {name: "继续归类剩余 45 个频道", exact: true}).click();
+    await page.getByRole("button", {name: "按方案自动归类全部频道", exact: true}).click();
     await expect.poll(() => typeof releaseMock).toBe("function");
     await page.getByRole("button", {name: "本批完成后停止", exact: true}).click();
     releaseMock(); releaseMock = null;
     await expect(progress).toContainText("已暂停");
     await expect(page.getByRole("progressbar", {name: "精简分类进度", exact: true})).toHaveAttribute("value", "20");
     await expect(page.getByRole("button", {name: "替换旧分类并应用", exact: true})).toBeDisabled();
-    mockHoldAt = mockFailureAt = 3;
+    mockHoldAt = mockFailureAt = 2;
     await page.getByRole("button", {name: "继续归类剩余 25 个频道", exact: true}).click();
     await expect.poll(() => typeof releaseMock).toBe("function");
     await expect(page.getByRole("button", {name: "本批完成后停止", exact: true})).toBeEnabled();
@@ -939,7 +947,7 @@ test("organization: count errors, rogue categories, pause, failed batch resume a
     await expect(page.getByRole("progressbar", {name: "精简分类进度", exact: true})).toHaveAttribute("value", "20");
     await page.getByRole("button", {name: "继续归类剩余 25 个频道", exact: true}).click();
     await expect(progress).toContainText("归类预览已完成");
-    expect(aiRequests.map(request => JSON.parse(request.body.messages[1].content).channels.length)).toEqual([20, 20, 20, 20, 5]);
+    expect(aiRequests.map(request => JSON.parse(request.body.messages[1].content).channels.length)).toEqual([20, 20, 20, 5]);
     expect(await getState()).toEqual(seed);
     await message({type: "renameGroup", id: "old0", name: "手工改名"});
     await expect(progress).toContainText("已变更");
@@ -1876,6 +1884,8 @@ test('page scripts cannot trigger privileged panel actions through the open shad
   await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state,'ycg.preferences.v1':{language:'zh-CN'}}),aiSeed);
   const options=await configureAI('api',mockOrigin+'/v1'),page=await openAssistant();
   await page.getByLabel('AI 分类范围',{exact:true}).selectOption('all');
+  // Let the feed's recent video titles settle so only privileged actions could change state.
+  await expect.poll(async()=>(await getState()).channels.every(channel=>channel.recentVideos?.length)).toBe(true);
   const before=await getState();aiRequests.length=0;
   // What a YouTube main-world script could do: find the buttons and call click() or dispatch change events.
   const clicked=await page.evaluate(()=>{
