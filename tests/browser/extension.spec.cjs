@@ -1856,6 +1856,23 @@ test('refresh subscriptions: opens the full list, offers channels no longer subs
   await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
 });
 
+test('sparse filtered feed: loads more pages automatically, a bounded number of times',async()=>{
+  await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state,'ycg.preferences.v1':{language:'zh-CN'},'ycg.filter.v1':'g'}),{version:1,groups:[{id:'g',name:'AI'}],channels:[{id:'/@alphaai',title:'Alpha AI',aliases:['/@alphaai'],groupIds:['g']}]});
+  const page=await context.newPage();
+  await page.addInitScript(()=>{window.ycgPages=0;addEventListener('scroll',()=>{const loader=document.querySelector('ytd-continuation-item-renderer');if(!loader)return;window.ycgPages++;
+    for(let i=0;i<10;i++)loader.insertAdjacentHTML('beforebegin',`<ytd-rich-item-renderer data-test-channel="BetaMusic"><h3>音乐 ${window.ycgPages}-${i}</h3><a href="/@BetaMusic">BetaMusic</a></ytd-rich-item-renderer>`);
+    loader.insertAdjacentHTML('beforebegin',`<ytd-rich-item-renderer data-test-channel="AlphaAI"><h3>AI ${window.ycgPages}</h3><a href="/@AlphaAI">AlphaAI</a></ytd-rich-item-renderer>`);});});
+  await page.goto('https://www.youtube.com/feed/subscriptions');
+  // The saved filter applies on load and hides everything but one card, so the loader sits in view.
+  await page.evaluate(()=>document.querySelector('main').append(document.createElement('ytd-continuation-item-renderer')));
+  await expect(page.locator('[data-test-channel="BetaMusic"]').first()).toBeHidden();
+  await expect.poll(()=>page.evaluate(()=>window.ycgPages),{timeout:20000}).toBe(8);
+  await page.waitForTimeout(2500);
+  expect(await page.evaluate(()=>window.ycgPages)).toBe(8);
+  await expect(page.locator('[data-test-channel="AlphaAI"]:visible')).toHaveCount(9);
+  await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
+});
+
 test('refresh subscriptions: an incomplete list suggests nothing',async()=>{
   await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state,'ycg.preferences.v1':{language:'zh-CN'}}),{version:1,groups:[],channels:[{id:'/@gonechannel',title:'Gone Channel',aliases:['/@gonechannel'],groupIds:[]}]});
   const page=await context.newPage();await page.goto('https://www.youtube.com/feed/channels');

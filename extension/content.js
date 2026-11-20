@@ -3,6 +3,8 @@
   if (document.getElementById("ycg-root")) return;
   const Core = globalThis.YCGCore, Dom = globalThis.YCGDom, I = globalThis.YCGI18n;
   let state = Core.empty(), selected = "all", search = "", channelPage = 0;
+  const SPARSE_FEED = 12, TOP_UP_LIMIT = 8;
+  let topUpRounds = 0, topUpTimer = 0;
   let privacy = {epoch: null, collectionPaused: false}, renderTicket = 0, renderFrame = 0, groupsSignature = "", filterTicket = 0;
   let scanTimer, scanning = false, recording = false, lastScan = "", busy = false;
   let resizeSession = null, sizeSaveTimer, sizeWrites = 0, sizeSaveId = 0;
@@ -519,7 +521,7 @@
   });
 
   function choose(id) {
-    selected = id; channelPage = 0; render(); applyFilter();
+    selected = id; channelPage = 0; topUpRounds = 0; render(); applyFilter();
     call({type: "filterSave", filter: id}).catch(() => {});
   }
   async function applyFilter() {
@@ -528,8 +530,10 @@
     if (!result || ticket !== filterTicket) return;
     const name = state.groups.find(group => group.id === selected)?.name || I.t(selected === "unassigned" ? "未分类" : "全部");
     const subscriptions = location.pathname.replace(/\/$/, "") === "/feed/subscriptions";
+    const loading = subscriptions && topUp(result);
     I.set(feedStatus, "textContent", subscriptions
-      ? result.unknown ? `显示 ${result.visible} / ${result.recognized} 个已加载视频 · ${result.unknown} 个未识别卡片保留` : `显示 ${result.visible} / ${result.recognized} 个已加载视频`
+      ? loading ? `显示 ${result.visible} / ${result.recognized} 个已加载视频 · 正在自动加载更多视频`
+        : result.unknown ? `显示 ${result.visible} / ${result.recognized} 个已加载视频 · ${result.unknown} 个未识别卡片保留` : `显示 ${result.visible} / ${result.recognized} 个已加载视频`
       : "");
     I.set(feedStatus, "title", "只筛选能识别频道的已加载视频；Shorts 合集等未识别内容保留显示。");
     feedStatus.hidden = !subscriptions; feedLink.hidden = subscriptions;
@@ -540,6 +544,15 @@
     collectButton.hidden = !channelsPage || !privacy.collectionPaused;
     if (!channelsPage && !loadingAll) coverage.hidden = true;
     currentButton.hidden = !Core.path(location.pathname);
+  }
+  // Hidden cards collapse the feed, so YouTube may never see the scroll that loads the next page.
+  // Nudge it a bounded number of times while the active filter shows too few videos.
+  function topUp(result) {
+    const loader = document.querySelector("ytd-continuation-item-renderer");
+    if (!result.active || result.visible >= SPARSE_FEED || !loader || topUpRounds >= TOP_UP_LIMIT) return false;
+    if (loader.getBoundingClientRect().top > innerHeight + 400) return false;
+    if (!topUpTimer) topUpTimer = setTimeout(() => { topUpTimer = 0; topUpRounds++; dispatchEvent(new Event("scroll")); }, 700);
+    return true;
   }
   function render() {
     renderTicket++;
@@ -784,7 +797,7 @@
   document.addEventListener("load", event => {
     if (event.target.matches?.("img") && event.target.closest("ytd-channel-renderer, ytd-grid-channel-renderer")) { Dom.invalidate([{target: event.target}]); schedule(); }
   }, true);
-  document.addEventListener("yt-navigate-finish", () => { lastScan = ""; schedule(); });
+  document.addEventListener("yt-navigate-finish", () => { lastScan = ""; topUpRounds = 0; schedule(); });
   window.addEventListener("popstate", schedule);
   window.addEventListener("focus", () => assistant.refreshInfo());
   schedule();
