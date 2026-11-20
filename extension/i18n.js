@@ -91,7 +91,7 @@
     "补充分类（保留已有分类）": "Add categories (keep existing)", "重新分类（替换勾选频道的分类）": "Reclassify (replace selected channels' categories)",
     "只替换勾选频道的分类；未勾选频道不变。应用后可撤销最近一次 AI 分类。": "Replace categories for selected channels only. You can undo the most recent AI application.",
     "例如：用中文分类，区分 AI 研究、AI 工具、编程教学": "Example: separate AI research, AI tools, and coding tutorials",
-    "AI 分类范围": "AI channel scope", "AI 处理数量": "AI processing size", "AI 应用方式": "AI apply mode", "AI 分类要求": "AI instructions",
+    "AI 分类范围": "AI channel scope", "AI 处理数量": "AI processing size", "AI 应用方式": "AI apply mode", "AI 分类要求": "AI instructions", "AI 分类要求（可选）": "AI instructions (optional)", "高级选项": "Advanced options", "全部频道": "All channels", "仅下一批": "Next batch only", "全部剩余": "All remaining", "重新分类": "Reclassify", "补充分类": "Add categories",
     "点击生成即按所选范围向服务分批发送频道名称、地址、已收集简介和分类要求。处理全部频道会产生多次请求，可能消耗更多账号额度。": "Generation sends the selected channel metadata and instructions in batches. More channels can use more account credits.",
     "生成分类建议": "Generate suggestions", "本批完成后停止": "Stop after this batch", "应用勾选建议": "Apply selected suggestions", "跳过这些建议": "Skip these suggestions", "从头检查": "Start over",
     "撤销上次 AI 分类": "Undo last AI application", "上次 AI 分类已撤销。空分类可在管理分类中删除。": "Last AI application undone. Remove unused categories in Manage categories.",

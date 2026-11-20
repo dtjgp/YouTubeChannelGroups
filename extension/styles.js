@@ -117,6 +117,8 @@ summary { cursor: pointer; font-weight: 600; font-size: var(--ycg-small); min-he
 .ai-assistant[open] summary { margin-bottom: 10px; }
 .ai-assistant select, .ai-assistant textarea { width: 100%; font: inherit; color: var(--text); border: 1px solid var(--control-line); background: var(--surface); border-radius: 8px; padding: 9px; margin: 6px 0; font-size: var(--ycg-small); }
 .ai-assistant .tools { margin: 8px 0; }
+.ai-advanced { margin: 6px 0; }
+.ai-advanced > summary { cursor: pointer; color: var(--muted-text); font-size: var(--ycg-small); padding: 4px 0; }
 .ai-assistant .muted { margin: 7px 0; }
 .ai-progress, .organization-progress { font-size: var(--ycg-small); overflow-wrap: anywhere; }
 .ai-suggestion { margin: 10px 0; border-top: 1px solid var(--control-line); padding-top: 12px; }

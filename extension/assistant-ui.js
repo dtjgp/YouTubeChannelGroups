@@ -105,20 +105,25 @@ globalThis.createYCGAssistant = function ({node, button, call, getState, mutate,
     onBusy(value) { organizerBusy = value; if (value) I.set(undoStatus, "textContent", ""); update(); },
     onApplied() { undoAvailable = true; reviewed.clear(); job = null; clearPreview(false); update(); }
   });
-  const standard = node("div", {class: "standard-assistant"}, [node("div", {class: "ai-configuration"}, [
+  // The defaults suit most runs, so the less common choices stay folded behind one summary line.
+  const summaryParts = [0, 1, 2].map(() => node("span", {localize: false}));
+  const advancedSummary = node("summary", {}, [node("span", {text: "高级选项"}), "：", summaryParts[0], " · ", summaryParts[1], " · ", summaryParts[2]]);
+  const advanced = node("details", {class: "ai-advanced"}, [advancedSummary,
     node("label", {class: "control-label", text: "分类范围"}, [scope]),
     node("label", {class: "control-label", text: "处理数量"}, [mode]),
     node("label", {class: "control-label", text: "应用方式"}, [applyMode]), replaceHint,
-    node("p", {class: "muted", text: "仅处理已收集频道；未加载的订阅频道需先在订阅列表中收集。"}),
-    node("label", {class: "control-label", text: "AI 分类要求"}, [instructions]), batchInfo, disclosure]),
+    node("p", {class: "muted", text: "仅处理已收集频道；未加载的订阅频道需先在订阅列表中收集。"})]);
+  const standard = node("div", {class: "standard-assistant"}, [node("div", {class: "ai-configuration"}, [
+    node("label", {class: "control-label", text: "AI 分类要求（可选）"}, [instructions]), advanced, batchInfo, disclosure]),
     node("div", {class: "ai-actions"}, [node("div", {class: "tools"}, [generate, stop, apply]), meter, progress, elapsed, previewCount]),
     node("div", {class: "tools review-secondary"}, [skip, reset, reviewEntry]), preview
   ]);
+  const settings = button("AI 设置", async () => {
+    try { await call({type: "openSettings"}); } catch (error) { I.set(progress, "textContent", error.message); }
+  });
   const element = node("details", {class: "ai-assistant"}, [
     node("summary", {text: "✦ AI 分类助手"}), info,
-    node("div", {class: "tools assistant-settings"}, [button("AI 设置", async () => {
-      try { await call({type: "openSettings"}); } catch (error) { I.set(progress, "textContent", error.message); }
-    })]),
+    node("div", {class: "tools assistant-settings"}, [settings]),
     node("label", {class: "control-label assistant-purpose", text: "任务"}, [purpose]), standard, organizer.element,
     node("div", {class: "tools shared-tools"}, [undo]), undoStatus
   ]);
@@ -131,6 +136,7 @@ globalThis.createYCGAssistant = function ({node, button, call, getState, mutate,
       const {config, undoAvailable: available} = await call({type: "aiInfo"});
       undoAvailable = available;
       const names = {codex: "本机 Codex", claude: "本机 Claude", api: "云端 API"};
+      settings.classList.toggle("primary", !config);
       I.set(info, "textContent", config ? `${I.t(names[config.provider])} · ${config.model || I.t("CLI 默认模型")} · ${config.provider === "api" ? new URL(config.endpoint).host : I.t("浏览器自动启动")}` : "尚未配置。请先打开“AI 设置”。");
       update();
     } catch (error) { if (!running) I.set(progress, "textContent", error.message); }
@@ -148,6 +154,9 @@ globalThis.createYCGAssistant = function ({node, button, call, getState, mutate,
       ? `本轮 ${job.total} 个频道，已完成 ${job.completed} 个，待处理 ${job.pending.length} 个。应用后，未勾选项本轮跳过。`
       : `将处理 ${count} / ${total} 个剩余频道，自动分为 ${Math.ceil(count / YCGAI.BATCH)} 批，每批最多 ${YCGAI.BATCH} 个。本轮已检查 ${reviewed.size} 个。`);
     I.set(generate, "textContent", job?.pending.length ? `继续剩余 ${job.pending.length} 个频道` : "生成分类建议");
+    I.set(summaryParts[0], "textContent", scope.value === "all" ? "全部频道" : "仅未分类频道");
+    I.set(summaryParts[1], "textContent", mode.value === "batch" ? "仅下一批" : "全部剩余");
+    I.set(summaryParts[2], "textContent", applyMode.value === "replace" ? "重新分类" : "补充分类");
     generate.disabled = !!running || (!job?.pending.length && (!!suggestions.length || !total));
     apply.disabled = skip.disabled = !!running || !suggestions.length;
     reviewEntry.hidden = !suggestions.length;

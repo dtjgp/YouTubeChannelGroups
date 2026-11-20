@@ -109,6 +109,11 @@ async function expand(page, selector) {
   const details = page.locator(`#ycg-root ${selector}`);
   if (!await details.evaluate(element => element.open)) await details.locator(":scope > summary").click();
 }
+// Less common AI choices are folded under "高级选项".
+async function aiOption(page, label, value) {
+  await expand(page, ".ai-advanced");
+  await page.getByLabel(label, {exact: true}).selectOption(value);
+}
 const message = action => testClient.evaluate(action => chrome.runtime.sendMessage({scope: "ycg", type: "mutate", action}), action);
 
 test("real extension: collect, categorize, filter, dynamic cards, navigation, backup, reload", async () => {
@@ -273,7 +278,7 @@ test("AI cloud: trusted settings, real local HTTP, editable preview, secret isol
   await page.goto("https://www.youtube.com/feed/subscriptions");
   await page.getByRole("button", {name: "频道分类", exact: true}).click();
   await page.getByText("✦ AI 分类助手", {exact: true}).click();
-  await page.getByLabel("AI 分类范围", {exact: true}).selectOption("all");
+  await aiOption(page, "AI 分类范围", "all");
   const before = await getState();
   await page.getByRole("button", {name: "生成分类建议", exact: true}).click();
   await expect(page.getByLabel("Alpha AI 的建议分类", {exact: true})).toBeVisible();
@@ -337,7 +342,7 @@ test("native Codex and Claude: browser starts compiled host and fixed CLI adapte
     expect((await getState()).groups).toHaveLength(2);
     await expect(page.getByRole("button", {name: "生成分类建议", exact: true})).toBeDisabled();
     await page.getByRole("button", {name: "从头检查", exact: true}).click();
-    await page.getByLabel("AI 分类范围", {exact: true}).selectOption("all");
+    await aiOption(page, "AI 分类范围", "all");
     await page.getByRole("button", {name: "生成分类建议", exact: true}).click();
     await expect(page.getByLabel("Beta Music 的建议分类", {exact: true})).toBeVisible();
     await page.getByRole("button", {name: "跳过这些建议", exact: true}).click();
@@ -372,6 +377,8 @@ test("all 134 channels: seven automatic requests, one preview and atomic apply",
   mockMode = "bulk"; aiRequests.length = 0;
   const page = await openAssistant();
   await expect(page.getByLabel("AI 处理数量", {exact: true})).toHaveValue("all");
+  await expect(page.getByLabel("AI 处理数量", {exact: true})).toBeHidden();
+  await expect(page.locator(".ai-advanced summary")).toHaveText("高级选项：仅未分类频道 · 全部剩余 · 补充分类");
   await expect(page.getByText(/将处理 134 \/ 134 个剩余频道/)).toBeVisible();
   await page.getByRole("button", {name: "生成分类建议", exact: true}).click();
   await expect(page.locator(".ai-progress")).toContainText("已完成 134 个频道的建议");
@@ -436,7 +443,7 @@ test("stop after the current batch, apply partial results, resume and select sin
     await page.getByRole("button", {name: "跳过这些建议", exact: true}).click();
     await expect(page.getByRole("button", {name: "生成分类建议", exact: true})).toBeDisabled();
     await page.getByRole("button", {name: "从头检查", exact: true}).click();
-    await page.getByLabel("AI 处理数量", {exact: true}).selectOption("batch");
+    await aiOption(page, "AI 处理数量", "batch");
     aiRequests.length = 0;
     await page.getByRole("button", {name: "生成分类建议", exact: true}).click();
     await expect(page.locator(".ai-progress")).toContainText("已完成 20 个频道的建议");
@@ -453,8 +460,8 @@ test("all categorized channels can be reclassified; unselected channels and late
   await worker.evaluate(state => chrome.storage.local.set({"ycg.state.v1": state, "ycg.ai.undo.v1": null}), aiSeed);
   const options = await configureAI("api", mockOrigin + "/v1");
   const page = await openAssistant();
-  await page.getByLabel("AI 分类范围", {exact: true}).selectOption("all");
-  await page.getByLabel("AI 应用方式", {exact: true}).selectOption("replace");
+  await aiOption(page, "AI 分类范围", "all");
+  await aiOption(page, "AI 应用方式", "replace");
   mockMode = "valid"; aiRequests.length = 0;
   await page.getByRole("button", {name: "生成分类建议", exact: true}).click();
   await expect(page.locator(".ai-progress")).toContainText("已完成 2 个频道");
@@ -508,7 +515,7 @@ test("live bilingual settings, real save milestones, draft preservation, exports
   expect(await options.evaluate(() => window.savePhases)).toEqual(expect.arrayContaining(["Validating settings…", "Requesting host permission…", "Saving locally…", "Settings saved"]));
   expect(await worker.evaluate(async () => (await chrome.storage.local.get("ycg.ai.settings.v1"))["ycg.ai.settings.v1"].model)).toBe("unsaved-model");
   await options.screenshot({path: path.join(artifacts, "preview-settings-en.png"), fullPage: true});
-  await page.getByLabel("AI channel scope", {exact: true}).selectOption("all");
+  await aiOption(page, "AI channel scope", "all");
   mockMode = "valid";
   await page.getByRole("button", {name: "Generate suggestions", exact: true}).click();
   await expect(page.locator(".ai-progress")).toContainText("Suggestions ready for 2 channels");
@@ -1507,7 +1514,7 @@ test('minimize: preserves drafts, review, saved geometry, theme, keyboard and fu
   await expect.poll(()=>panel.boundingBox()).toEqual(geometry);
   await expect(page.getByRole('textbox',{name:'AI instructions',exact:true})).toHaveValue('保留最小化前的要求');
   await options.getByLabel('Interface language',{exact:true}).selectOption('zh-CN');
-  await page.getByLabel('AI 分类范围',{exact:true}).selectOption('all');
+  await aiOption(page, 'AI 分类范围', 'all');
   await page.getByRole('button',{name:'生成分类建议',exact:true}).click();
   const suggested=page.getByLabel('Alpha AI 的建议分类',{exact:true});await expect(suggested).toBeVisible();await suggested.fill('保留审核编辑');
   await page.getByRole('button',{name:'最小化分类窗口',exact:true}).click();await restore.click();
@@ -1680,7 +1687,7 @@ test('AI draft: unapplied edits survive a reload of the same tab and are removed
   const drafts=()=>worker.evaluate(async()=>Object.keys(await chrome.storage.session.get(null)).filter(key=>key.startsWith('ycg.ai.draft.')));
   const options=await configureAI('api',mockOrigin+'/v1');
   let page=await openAssistant();
-  await page.getByLabel('AI 分类范围',{exact:true}).selectOption('all');
+  await aiOption(page, 'AI 分类范围', 'all');
   await page.getByRole('button',{name:'生成分类建议',exact:true}).click();
   const suggested=()=>page.getByLabel('Alpha AI 的建议分类',{exact:true});
   await expect(suggested()).toBeVisible();await suggested().fill('刷新后保留, 编程');
@@ -1699,7 +1706,7 @@ test('AI draft: unapplied edits survive a reload of the same tab and are removed
   await expect.poll(drafts).toEqual([]);
   await page.close();
   page=await openAssistant();
-  await page.getByLabel('AI 分类范围',{exact:true}).selectOption('all');
+  await aiOption(page, 'AI 分类范围', 'all');
   await page.getByRole('button',{name:'从头检查',exact:true}).click();
   await page.getByRole('button',{name:'生成分类建议',exact:true}).click();
   await expect(suggested()).toBeVisible();
@@ -1959,7 +1966,7 @@ test('unsubscribe: an unrecognized YouTube dialog still works because the result
 test('page scripts cannot trigger privileged panel actions through the open shadow root',async()=>{
   await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state,'ycg.preferences.v1':{language:'zh-CN'}}),aiSeed);
   const options=await configureAI('api',mockOrigin+'/v1'),page=await openAssistant();
-  await page.getByLabel('AI 分类范围',{exact:true}).selectOption('all');
+  await aiOption(page, 'AI 分类范围', 'all');
   // Let the feed's recent video titles settle so only privileged actions could change state.
   await expect.poll(async()=>(await getState()).channels.every(channel=>channel.recentVideos?.length)).toBe(true);
   const before=await getState();aiRequests.length=0;
@@ -2051,7 +2058,7 @@ test('README screenshots: main panel in both languages and the review workspace'
   await expect(page.getByRole('button',{name:'Refresh subscriptions',exact:true})).toBeVisible();
   await panel.screenshot({path:path.join(out,'panel-en.png')});
   await page.getByText('✦ AI assistant',{exact:true}).click();
-  await page.getByLabel('AI channel scope',{exact:true}).selectOption('all');
+  await aiOption(page,'AI channel scope','all');
   await page.getByRole('button',{name:'Generate suggestions',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Classification review',exact:true})).toBeVisible();
   await panel.screenshot({path:path.join(out,'review-en.png')});
