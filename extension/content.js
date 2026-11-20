@@ -797,6 +797,16 @@
   document.addEventListener("load", event => {
     if (event.target.matches?.("img") && event.target.closest("ytd-channel-renderer, ytd-grid-channel-renderer")) { Dom.invalidate([{target: event.target}]); schedule(); }
   }, true);
+  // A new subscription made anywhere on YouTube is added to the local list right away.
+  document.addEventListener("click", event => {
+    if (!initialized || !(event.target instanceof Element)) return;
+    YCGUnsubscribe.subscribed(document, location.pathname, event.target).then(async channel => {
+      if (!channel || privacy.collectionPaused) return;
+      const known = state.channels.some(item => item.aliases.some(alias => channel.aliases.includes(alias)));
+      await mutate({type: "collect", channels: [channel]});
+      if (!known) say(`已加入新订阅的频道“${channel.title}”，可在面板中为它分类`);
+    }).catch(() => {});
+  }, true);
   document.addEventListener("yt-navigate-finish", () => { lastScan = ""; topUpRounds = 0; schedule(); });
   window.addEventListener("popstate", schedule);
   window.addEventListener("focus", () => assistant.refreshInfo());

@@ -1873,6 +1873,29 @@ test('sparse filtered feed: loads more pages automatically, a bounded number of 
   await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
 });
 
+test('subscribe in YouTube: the channel page header and a video owner row add the channel automatically',async()=>{
+  await worker.evaluate(()=>chrome.storage.local.set({'ycg.preferences.v1':{language:'zh-CN'},'ycg.privacy.v1':{epoch:'e',collectionPaused:false}}));
+  const page=await context.newPage();
+  await page.addInitScript(()=>{
+    // YouTube flips the button to "Subscribed" after its request completes.
+    document.addEventListener('click',event=>{const button=event.target.closest('#subscribe-button button');if(button&&button.textContent==='订阅')setTimeout(()=>{button.textContent='已订阅';},300);});
+    document.addEventListener('DOMContentLoaded',()=>{
+      document.querySelector('ytd-page-header-renderer')?.insertAdjacentHTML('beforeend','<div id="subscribe-button"><button>订阅</button></div>');
+      if(location.pathname==='/watch')document.querySelector('main').insertAdjacentHTML('beforeend','<div id="owner"><ytd-video-owner-renderer><ytd-channel-name id="channel-name"><a href="/@ownerchannel">Owner Channel</a></ytd-channel-name></ytd-video-owner-renderer><div id="subscribe-button"><button>订阅</button></div></div>');});});
+  await page.goto('https://www.youtube.com/@newchannel');
+  await expect(page.getByRole('button',{name:'频道分类',exact:true})).toBeEnabled();
+  await page.locator('#subscribe-button button').click();
+  await expect.poll(async()=>(await getState())?.channels.map(channel=>channel.id)).toEqual(['/@newchannel']);
+  expect((await getState()).channels[0].title).toBe('New Channel');
+  await page.goto('https://www.youtube.com/watch?v=x');
+  await expect(page.getByRole('button',{name:'频道分类',exact:true})).toBeEnabled();
+  await page.locator('#subscribe-button button').click();
+  await expect.poll(async()=>(await getState())?.channels.map(channel=>channel.id).sort()).toEqual(['/@newchannel','/@ownerchannel']);
+  await page.getByRole('button',{name:'频道分类',exact:true}).click();
+  await expect(page.locator('.status')).toHaveText('已加入新订阅的频道“Owner Channel”，可在面板中为它分类');
+  await page.close();await worker.evaluate(()=>chrome.storage.local.clear());
+});
+
 test('refresh subscriptions: an incomplete list suggests nothing',async()=>{
   await worker.evaluate(state=>chrome.storage.local.set({'ycg.state.v1':state,'ycg.preferences.v1':{language:'zh-CN'}}),{version:1,groups:[],channels:[{id:'/@gonechannel',title:'Gone Channel',aliases:['/@gonechannel'],groupIds:[]}]});
   const page=await context.newPage();await page.goto('https://www.youtube.com/feed/channels');

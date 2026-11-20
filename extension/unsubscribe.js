@@ -74,5 +74,21 @@
     return [...document.querySelectorAll("ytd-channel-renderer, ytd-grid-channel-renderer")]
       .filter(card => status(card.querySelector(AREA)).state !== "unsubscribed").map(card => Dom.identity(card)).filter(Boolean);
   }
-  root.YCGUnsubscribe = {area, status, open, wait, subscribedCards};
+  // The channel that owns a subscribe control: a channel card, the channel's own page header, or the owner row of a video.
+  function owner(document, pathname, control) {
+    const card = control.closest("ytd-channel-renderer, ytd-grid-channel-renderer");
+    if (card) return Dom.identity(card);
+    if (control.closest(HEADER)) return Dom.current(document, pathname);
+    const row = control.closest("#owner, ytd-video-owner-renderer");
+    return row ? Dom.identity(row) : null;
+  }
+  // Resolves to the channel after a click on "Subscribe" turns into "Subscribed", or null.
+  async function subscribed(document, pathname, target, timeout = 15000) {
+    const control = target.closest(AREA);
+    if (!control || status(control).state !== "unsubscribed") return null;
+    const channel = owner(document, pathname, control);
+    if (!channel) return null;
+    return await until(() => status(control).state === "subscribed", timeout) ? channel : null;
+  }
+  root.YCGUnsubscribe = {area, status, open, wait, subscribedCards, subscribed};
 })(globalThis);
