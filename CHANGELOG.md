@@ -1,6 +1,16 @@
 # 更新记录 · Changelog
 
-版本号同时写在 `extension/manifest.json`、`package.json` 和 `package-lock.json`。本机小助手（Native Messaging helper）单独编号，当前为 0.3.0；它的变更在对应版本中注明，需要重新运行安装器才会更新。
+版本号同时写在 `extension/manifest.json`、`package.json` 和 `package-lock.json`。本机小助手（Native Messaging helper）单独编号，当前为 0.4.0；它的变更在对应版本中注明，需要重新运行安装器才会更新。
+
+## v0.16.0
+
+AI 分类质量与 YouTube 使用体验改进。本机小助手升级到 0.4.0，使用本机 Codex／Claude 的用户需要重新运行安装器。
+
+- AI 分类：提示词和结果解析更稳，部分批次失败时可只重试失败部分；会参考频道最近的视频标题来判断主题。
+- 订阅页：顶部显示分类标签栏，可直接按分类筛选；选择的分类会被记住；筛选后内容太少时自动加载更多。
+- 订阅新频道时自动收集到频道列表。
+- “AI 分类助手”的高级选项默认收起。
+- 修复：记录视频标题不会再让 AI 精简方案、应用和撤销被误判为“频道或分类已变更”。
 
 ## v0.15.1
 
