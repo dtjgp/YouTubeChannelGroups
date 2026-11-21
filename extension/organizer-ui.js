@@ -14,7 +14,7 @@ globalThis.createYCGOrganizer = function ({node, button, call, getState, mutate,
   let comparedState, comparedBase, changed;
   const stale = () => {
     const state = getState();
-    if (state !== comparedState || base !== comparedBase) { comparedState = state; comparedBase = base; changed = base && JSON.stringify(base) !== JSON.stringify(state); }
+    if (state !== comparedState || base !== comparedBase) { comparedState = state; comparedBase = base; changed = base && YCGCore.classification(base) !== YCGCore.classification(state); }
     return changed;
   };
   function busy(value) { running = value; onBusy(!!value); update(); }
